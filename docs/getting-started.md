@@ -44,18 +44,18 @@ Use the same command from `samples/viewer-blazor/bin/Debug/net10.0` or `src/Repo
 dotnet run --project src/ReportCreator.Builder
 ```
 
-The window has the block list on the left, the page preview in the middle, and the property panel on the right.
+The window has the block list on the left, the PDF preview in the middle, and the property panel on the right. The preview is the same PDF export the File menu writes. It refreshes about half a second after you change the report or the data. Choosing another block does not reprint.
 
 1. Choose **File → New**, or **File → New invoice sample** to open the invoice with its sample data.
-2. Choose **Page setup** and set the paper, orientation, and margins. Lengths are millimetres.
-3. In the block list, pick Header, Body, or Footer, pick a block kind, and click **Add**.
-4. Select the block and edit it in the property panel. Click a block in the preview to select it there. Each block has a light gray outline. The selected block is blue.
+2. Choose **Page setup** and set the paper, orientation, and margins. Lengths are millimetres. Page header and page footer heights are millimetres too. `0` means 14 mm when that band has blocks, and the number strip is 6 mm when page numbers are on. Page numbers are none, bottom left, bottom center, or bottom right, and they print as `Page 1 of 2`.
+3. In the block list, pick Header, Body, Footer, Page header, or Page footer, pick a block kind, and click **Add**.
+4. Select the block and edit it in the property panel.
 5. Use **Up**, **Down**, and **Delete** to reorder the list.
-6. Choose **File → Open data** and pick a JSON object such as `fixtures/invoice/data.json`. That data is for the preview. Save does not write it into the report file.
+6. Open the **Data** expander to edit the preview JSON. **Insert missing fields** adds paths the report binds and leaves values you already typed. Choose **File → Open data** and pick a JSON object such as `fixtures/invoice/data.json`. That data is for the preview. Save does not write it into the report file.
 7. Choose **File → Save as**. A `.json` file is the definition. A `.rcreport` file is a zip that contains `definition.json`.
 8. Choose **File → Export HTML** or **File → Export PDF**.
 
-Header, body, and footer each print once. They are not repeated on every page.
+Header, body, and footer each print once. Page header and page footer repeat on every page. Put the letterhead in the page header and a one-time title in the report header.
 
 ## See the invoice
 
@@ -87,7 +87,7 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 | Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | Two or three equal columns. The builder adds text, field, and spacer inside a column. A columns block cannot contain another columns block. |
-| Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. |
+| Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |
 
 A text block mixes words and values:
 
@@ -151,6 +151,33 @@ The whole `source` value can be up to 2,000,000 characters. Font size is 6 to 96
 
 Two aggregates on the same column show only the first one. The aggregate label prints in the first column when that column has no aggregate of its own.
 
+**Show when** hides a block from one path. Leave the path blank to always show it. The kinds are not empty, empty, equals, not equals, greater than, and less than. A comparison needs a value. Numbers compare as decimals. Everything else compares as text. A missing path counts as empty.
+
+```json
+{ "type": "text", "id": "paid", "text": "Paid", "when": { "path": "invoice.balance", "kind": "equals", "value": "0" } }
+```
+
+A grouped table prints a heading for each distinct value, in the order it first appears. An empty key prints `(blank)`.
+
+```json
+{
+  "type": "table",
+  "id": "lines",
+  "dataPath": "lines",
+  "groupBy": "customer",
+  "columns": [
+    { "header": "Customer", "path": "customer" },
+    { "header": "Amount", "path": "amount", "format": "0.00", "align": "right", "runningTotal": true }
+  ],
+  "groupAggregates": [
+    { "label": "Subtotal", "columnPath": "amount", "kind": "sum", "format": "0.00" }
+  ],
+  "aggregates": [
+    { "label": "Total", "columnPath": "amount", "kind": "sum", "format": "0.00" }
+  ]
+}
+```
+
 ## Code samples
 
 Reference `ReportCreator.Compile` to load a report and produce HTML. Reference `ReportCreator.Pdf` as well when you export PDF. Reference `ReportCreator.Blazor` for the viewer component.
@@ -196,7 +223,16 @@ var definition = new ReportDefinition
     {
         Paper = PaperKind.A4,
         Orientation = PageOrientation.Portrait,
-        Margin = new Margin { Top = 12, Right = 12, Bottom = 12, Left = 12 }
+        Margin = new Margin { Top = 12, Right = 12, Bottom = 12, Left = 12 },
+        PageHeaderMm = 12,
+        PageNumbers = PageNumberPlacement.BottomCenter
+    },
+    PageHeader =
+    {
+        Blocks =
+        [
+            new TextBlock { Id = "running", Text = "Acme" }
+        ]
     },
     Header =
     {
@@ -289,6 +325,15 @@ await File.WriteAllBytesAsync("invoice.pdf", pdf);
 
 Set `Container = true` when the process runs in Azure Container Apps. Leave it off on Windows. The [README](../README.md) has the container notes.
 
+The repository `Dockerfile` publishes the Blazor sample and installs Chromium into `mcr.microsoft.com/dotnet/aspnet:10.0`. Docker must be using Linux containers.
+
+```powershell
+docker build -t see-attached .
+docker run --rm -p 8080:8080 see-attached
+```
+
+Open `http://localhost:8080`. The image sets `REPORTCREATOR_CONTAINER=1`. The sample reads that variable and turns on `Container`. The library does not read it. Give the container at least 1 GB of memory.
+
 ### Show the HTML in Blazor
 
 Add the Blazor project reference and the compiled HTML. The component does not bind data. Pass `Pdf` when you want the Download PDF button.
@@ -313,4 +358,4 @@ var definition = ReportJson.Read(reader.ReadToEnd());
 
 ## Where page breaks appear
 
-The builder preview and the viewers show one paper-width column. Chromium inserts page breaks when you print or export PDF. A table header repeats on the next page. The screen view does not draw those breaks.
+The builder preview is the PDF, so page breaks, the repeated page header, the repeated page footer, and the page numbers are the printed page. The Blazor and Next.js viewers show one paper-width column. Chromium inserts page breaks when that HTML is printed. A table header repeats on the next page. A row, and a block marked keep together, stay on one page.

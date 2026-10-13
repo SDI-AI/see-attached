@@ -24,6 +24,9 @@ public static partial class ReportCompiler
 
         var size = PaperCatalog.Resolve(definition.Page);
         var margin = definition.Page.Margin;
+        var headerMm = PageMetrics.Header(definition);
+        var footerMm = PageMetrics.Footer(definition);
+        var numberMm = PageMetrics.Numbers(definition.Page);
         var html = new StringBuilder();
         html.Append("<!DOCTYPE html><html lang=\"")
             .Append(Encode(options.Culture.Name.Length == 0 ? "en" : options.Culture.Name))
@@ -31,15 +34,28 @@ public static partial class ReportCompiler
             .Append(Encode(definition.Name))
             .Append("</title><style>")
             .Append(FontFaces.Value)
-            .Append(SheetCss(size, margin))
+            .Append(SheetCss(size, margin, headerMm, footerMm, numberMm, definition.Page.PageNumbers))
             .Append("</style></head><body");
         if (options.DesignMode)
             html.Append(" class=\"design\"");
         html.Append("><article class=\"sheet\" data-rc=\"1\">");
+        if (headerMm > 0)
+        {
+            html.Append("<header class=\"page-chrome page-header\">");
+            RenderBand(html, definition.PageHeader, data, options);
+            html.Append("</header>");
+        }
 
         RenderBand(html, definition.Header, data, options);
         RenderBand(html, definition.Body, data, options);
         RenderBand(html, definition.Footer, data, options);
+        if (footerMm > 0)
+        {
+            html.Append("<footer class=\"page-chrome page-footer\">");
+            RenderBand(html, definition.PageFooter, data, options);
+            html.Append("</footer>");
+        }
+
         html.Append("</article>");
         if (options.DesignMode)
             html.Append(DesignScript);
@@ -60,6 +76,9 @@ public static partial class ReportCompiler
 
     private static void RenderBlock(StringBuilder html, Block block, JsonElement data, CompileOptions options)
     {
+        if (!IsShown(block, data))
+            return;
+
         var selected = block.Id == options.SelectedId ? " rc-selected" : "";
         var keep = block.KeepTogether ? " keep" : "";
         switch (block)
@@ -149,39 +168,61 @@ public static partial class ReportCompiler
         }
 
         html.Append("<tbody>");
-        foreach (var row in rows)
+        var running = new decimal[table.Columns.Count];
+        foreach (var group in Groups(rows, table.GroupBy))
         {
-            html.Append("<tr>");
-            foreach (var column in table.Columns)
+            Array.Clear(running);
+            if (!string.IsNullOrWhiteSpace(table.GroupBy))
             {
-                var cell = DataValues.TryResolve(row, column.Path, out var value)
-                    ? DataValues.Format(value, column.Format, options.Culture)
+                var key = DataValues.TryResolve(group[0], table.GroupBy, out var keyValue)
+                    ? DataValues.Format(keyValue, null, options.Culture)
                     : "";
-                html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
-                    .Append(Encode(cell))
-                    .Append("</td>");
+                html.Append("<tr class=\"group-head\"><td colspan=\"")
+                    .Append(table.Columns.Count.ToString(CultureInfo.InvariantCulture))
+                    .Append("\">")
+                    .Append(Encode(key.Length == 0 ? "(blank)" : key))
+                    .Append("</td></tr>");
             }
-            html.Append("</tr>");
+
+            foreach (var row in group)
+            {
+                html.Append("<tr>");
+                for (var index = 0; index < table.Columns.Count; index++)
+                {
+                    var column = table.Columns[index];
+                    string cell;
+                    if (column.RunningTotal)
+                    {
+                        if (DataValues.TryResolve(row, column.Path, out var amount) && DataValues.AsDecimal(amount) is decimal number)
+                            running[index] += number;
+                        cell = DataValues.Format(JsonSerializer.SerializeToElement(running[index]), column.Format, options.Culture);
+                    }
+                    else
+                    {
+                        cell = DataValues.TryResolve(row, column.Path, out var value)
+                            ? DataValues.Format(value, column.Format, options.Culture)
+                            : "";
+                    }
+
+                    html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
+                        .Append(Encode(cell))
+                        .Append("</td>");
+                }
+
+                html.Append("</tr>");
+            }
+
+            if (table.GroupAggregates.Count > 0)
+                AppendAggregateRow(html, table.Columns, table.GroupAggregates, group, options.Culture, "group-foot");
         }
+
         html.Append("</tbody>");
 
         if (table.Aggregates.Count > 0)
         {
-            html.Append("<tfoot><tr>");
-            for (var index = 0; index < table.Columns.Count; index++)
-            {
-                var column = table.Columns[index];
-                var aggregate = table.Aggregates.FirstOrDefault(item => item.ColumnPath == column.Path);
-                string cell;
-                if (aggregate is null)
-                    cell = index == 0 ? table.Aggregates[0].Label ?? "" : "";
-                else
-                    cell = Aggregate(aggregate, rows, options.Culture);
-                html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
-                    .Append(Encode(cell))
-                    .Append("</td>");
-            }
-            html.Append("</tr></tfoot>");
+            html.Append("<tfoot>");
+            AppendAggregateRow(html, table.Columns, table.Aggregates, rows, options.Culture, null);
+            html.Append("</tfoot>");
         }
 
         html.Append("</table>");
@@ -200,6 +241,97 @@ public static partial class ReportCompiler
         }
 
         return rows;
+    }
+
+    private static List<List<JsonElement>> Groups(List<JsonElement> rows, string? groupBy)
+    {
+        if (string.IsNullOrWhiteSpace(groupBy))
+            return rows.Count == 0 ? [] : [rows];
+
+        var groups = new List<List<JsonElement>>();
+        var index = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var row in rows)
+        {
+            var key = DataValues.TryResolve(row, groupBy, out var value)
+                ? DataValues.Format(value, null, CultureInfo.InvariantCulture)
+                : "";
+            if (!index.TryGetValue(key, out var at))
+            {
+                at = groups.Count;
+                index[key] = at;
+                groups.Add([]);
+            }
+
+            groups[at].Add(row);
+        }
+
+        return groups;
+    }
+
+    private static void AppendAggregateRow(
+        StringBuilder html,
+        List<TableColumn> columns,
+        List<TableAggregate> aggregates,
+        List<JsonElement> rows,
+        CultureInfo culture,
+        string? rowClass)
+    {
+        html.Append("<tr");
+        if (rowClass is not null)
+            html.Append(" class=\"").Append(rowClass).Append('"');
+        html.Append('>');
+        for (var index = 0; index < columns.Count; index++)
+        {
+            var column = columns[index];
+            var aggregate = aggregates.FirstOrDefault(item => item.ColumnPath == column.Path);
+            var cell = aggregate is null
+                ? index == 0 ? aggregates[0].Label ?? "" : ""
+                : Aggregate(aggregate, rows, culture);
+            html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
+                .Append(Encode(cell))
+                .Append("</td>");
+        }
+
+        html.Append("</tr>");
+    }
+
+    private static bool IsShown(Block block, JsonElement data)
+    {
+        if (block.When is null || string.IsNullOrWhiteSpace(block.When.Path))
+            return true;
+
+        var found = DataValues.TryResolve(data, block.When.Path, out var value);
+        var empty = !found || IsEmpty(value);
+        return block.When.Kind switch
+        {
+            ShowWhenKind.Empty => empty,
+            ShowWhenKind.NotEmpty => !empty,
+            ShowWhenKind.Equals => found && Compare(value, block.When.Value) == 0,
+            ShowWhenKind.NotEquals => !found || Compare(value, block.When.Value) != 0,
+            ShowWhenKind.GreaterThan => found && Compare(value, block.When.Value) > 0,
+            ShowWhenKind.LessThan => found && Compare(value, block.When.Value) < 0,
+            _ => true
+        };
+    }
+
+    private static bool IsEmpty(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Null or JsonValueKind.Undefined => true,
+        JsonValueKind.String => string.IsNullOrWhiteSpace(value.GetString()),
+        JsonValueKind.Array => value.GetArrayLength() == 0,
+        JsonValueKind.Object => !value.EnumerateObject().Any(),
+        _ => false
+    };
+
+    private static int Compare(JsonElement value, string? expected)
+    {
+        expected ??= "";
+        if (DataValues.AsDecimal(value) is decimal number
+            && decimal.TryParse(expected, NumberStyles.Number, CultureInfo.InvariantCulture, out var target))
+            return number.CompareTo(target);
+
+        var text = value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : value.ToString();
+        return string.Compare(text, expected, StringComparison.Ordinal);
     }
 
     private static string Aggregate(TableAggregate aggregate, List<JsonElement> rows, CultureInfo culture)
@@ -250,7 +382,7 @@ public static partial class ReportCompiler
         return html.ToString();
     }
 
-    private static string SheetCss(PageSize size, Margin margin) =>
+    private static string SheetCss(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers) =>
         $$"""
         html, body { margin: 0; padding: 0; }
         body {
@@ -274,6 +406,9 @@ public static partial class ReportCompiler
         .block { margin: 0 0 2mm; }
         .block:last-child { margin-bottom: 0; }
         .keep, tr { break-inside: avoid; }
+        tr.group-head { break-after: avoid; }
+        tr.group-head td { font-weight: 700; background: #f9fafb; border-bottom: 0.3mm solid #111827; }
+        tr.group-foot td { font-weight: 700; border-top: 0.2mm solid #9ca3af; }
         .cols { display: grid; gap: 8mm; }
         .cols-2 { grid-template-columns: 1fr 1fr; }
         .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
@@ -288,13 +423,61 @@ public static partial class ReportCompiler
         .rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
         body.design .block { cursor: pointer; outline: 1px solid #d1d5db; }
         body.design .block.rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
-        @page { size: {{Num(size.WidthMm)}}mm {{Num(size.HeightMm)}}mm; margin: {{Num(margin.Top)}}mm {{Num(margin.Right)}}mm {{Num(margin.Bottom)}}mm {{Num(margin.Left)}}mm; }
+        {{PageRule(size, margin, headerMm, footerMm, numberMm, numbers)}}
         @media print {
           body { background: #fff; }
           .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
           .rc-selected, body.design .block { outline: none; }
+          {{FixedChrome(margin, headerMm, footerMm, numberMm)}}
         }
         """;
+
+    private static string PageRule(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers)
+    {
+        var top = margin.Top + headerMm;
+        var bottom = margin.Bottom + footerMm + numberMm;
+        var rule = new StringBuilder();
+        rule.Append("@page { size: ").Append(Num(size.WidthMm)).Append("mm ").Append(Num(size.HeightMm))
+            .Append("mm; margin: ").Append(Num(top)).Append("mm ").Append(Num(margin.Right))
+            .Append("mm ").Append(Num(bottom)).Append("mm ").Append(Num(margin.Left)).Append("mm;");
+        if (numbers != PageNumberPlacement.None)
+        {
+            var slot = numbers switch
+            {
+                PageNumberPlacement.BottomLeft => "bottom-left",
+                PageNumberPlacement.BottomRight => "bottom-right",
+                _ => "bottom-center"
+            };
+            rule.Append(" @").Append(slot)
+                .Append(" { content: \"Page \" counter(page) \" of \" counter(pages); font-family: \"Source Sans 3\", sans-serif; font-size: 9pt; color: #6b7280;");
+            if (footerMm > 0)
+                rule.Append(" margin-top: ").Append(Num(footerMm)).Append("mm;");
+            rule.Append(" }");
+        }
+
+        rule.Append(" }");
+        return rule.ToString();
+    }
+
+    private static string FixedChrome(Margin margin, decimal headerMm, decimal footerMm, decimal numberMm)
+    {
+        var css = new StringBuilder();
+        if (headerMm > 0)
+        {
+            css.Append(".page-header { position: fixed; overflow: hidden; top: ").Append(Num(margin.Top))
+                .Append("mm; left: ").Append(Num(margin.Left)).Append("mm; right: ").Append(Num(margin.Right))
+                .Append("mm; height: ").Append(Num(headerMm)).Append("mm; }");
+        }
+
+        if (footerMm > 0)
+        {
+            css.Append(".page-footer { position: fixed; overflow: hidden; bottom: ").Append(Num(margin.Bottom + numberMm))
+                .Append("mm; left: ").Append(Num(margin.Left)).Append("mm; right: ").Append(Num(margin.Right))
+                .Append("mm; height: ").Append(Num(footerMm)).Append("mm; }");
+        }
+
+        return css.ToString();
+    }
 
     private static string StyleOf(decimal fontSizePt, bool bold, string? color, TextAlign align)
     {

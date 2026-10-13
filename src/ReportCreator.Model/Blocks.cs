@@ -28,6 +28,8 @@ public abstract class Block
     public string Id { get; set; } = "";
 
     public bool KeepTogether { get; set; }
+
+    public ShowWhen? When { get; set; }
 }
 
 public sealed class TextBlock : Block
@@ -95,6 +97,8 @@ public sealed class TableColumn
     public TextAlign Align { get; set; } = TextAlign.Left;
 
     public decimal? WidthMm { get; set; }
+
+    public bool RunningTotal { get; set; }
 }
 
 public sealed class TableAggregate
@@ -114,7 +118,11 @@ public sealed class TableBlock : Block
 
     public bool ShowHeader { get; set; } = true;
 
+    public string? GroupBy { get; set; }
+
     public List<TableColumn> Columns { get; set; } = [];
 
     public List<TableAggregate> Aggregates { get; set; } = [];
+
+    public List<TableAggregate> GroupAggregates { get; set; } = [];
 }

@@ -220,6 +220,119 @@ public class ReportTests
         Assert.Contains("size: 279.4mm 215.9mm;", html, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PageChrome_RepeatsHeaderAndPrintsPageNumbers()
+    {
+        var definition = new ReportDefinition
+        {
+            Page = new PageSetup { PageNumbers = PageNumberPlacement.BottomCenter, PageHeaderMm = 12, PageFooterMm = 10 },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "Acme" }] },
+            PageFooter = { Blocks = [new TextBlock { Id = "copy", Text = "File copy" }] },
+            Body = { Blocks = [new TextBlock { Id = "body", Text = "Body" }] }
+        };
+
+        var html = ReportCompiler.Compile(definition, default);
+
+        Assert.Contains("class=\"page-chrome page-header\"", html, StringComparison.Ordinal);
+        Assert.Contains(">Acme<", html, StringComparison.Ordinal);
+        Assert.Contains(">File copy<", html, StringComparison.Ordinal);
+        Assert.Contains("position: fixed", html, StringComparison.Ordinal);
+        Assert.Contains("counter(page)", html, StringComparison.Ordinal);
+        Assert.Contains("counter(pages)", html, StringComparison.Ordinal);
+        Assert.Contains("margin: 24mm 12mm 28mm 12mm;", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ShowWhen_HidesAndCompares()
+    {
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TextBlock { Id = "shown", Text = "Visible note", When = new ShowWhen { Path = "note", Kind = ShowWhenKind.NotEmpty } },
+                    new TextBlock { Id = "hidden", Text = "Secret", When = new ShowWhen { Path = "secret", Kind = ShowWhenKind.NotEmpty } },
+                    new TextBlock { Id = "match", Text = "Two items", When = new ShowWhen { Path = "qty", Kind = ShowWhenKind.Equals, Value = "2" } },
+                    new TextBlock { Id = "blank", Text = "No secret", When = new ShowWhen { Path = "secret", Kind = ShowWhenKind.Empty } }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { note = "Hi", qty = 2 });
+
+        var html = ReportCompiler.Compile(definition, data);
+
+        Assert.Contains("Visible note", html, StringComparison.Ordinal);
+        Assert.Contains("Two items", html, StringComparison.Ordinal);
+        Assert.Contains("No secret", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Secret", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Table_GroupsRowsAndCarriesARunningTotal()
+    {
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        GroupBy = "customer",
+                        Columns =
+                        [
+                            new TableColumn { Header = "Customer", Path = "customer" },
+                            new TableColumn { Header = "Amount", Path = "amount", Format = "0.00", Align = TextAlign.Right, RunningTotal = true }
+                        ],
+                        GroupAggregates = [new TableAggregate { Label = "Subtotal", ColumnPath = "amount", Kind = AggregateKind.Sum, Format = "0.00" }],
+                        Aggregates = [new TableAggregate { Label = "Total", ColumnPath = "amount", Kind = AggregateKind.Sum, Format = "0.00" }]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            lines = new[]
+            {
+                new { customer = "Ada", amount = 1 },
+                new { customer = "Ada", amount = 2 },
+                new { customer = "Bea", amount = 4 }
+            }
+        });
+
+        var html = ReportCompiler.Compile(definition, data, new CompileOptions { Culture = CultureInfo.InvariantCulture });
+
+        Assert.Contains(">Ada<", html, StringComparison.Ordinal);
+        Assert.Contains(">Bea<", html, StringComparison.Ordinal);
+        Assert.Contains(">1.00<", html, StringComparison.Ordinal);
+        Assert.Contains(">3.00<", html, StringComparison.Ordinal);
+        Assert.Contains(">4.00<", html, StringComparison.Ordinal);
+        Assert.Contains(">Subtotal<", html, StringComparison.Ordinal);
+        Assert.Contains(">7.00<", html, StringComparison.Ordinal);
+        Assert.Contains("group-head", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Sample_BuildsTheShapeTheReportBinds()
+    {
+        var definition = ReadInvoice();
+        var sample = ReportBindings.Sample(definition);
+        var json = sample.GetRawText();
+
+        Assert.Contains("\"invoice\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"number\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"lines\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"description\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"amount\"", json, StringComparison.Ordinal);
+
+        var merged = ReportBindings.MergeMissing(ReadInvoiceData(), sample);
+        Assert.Equal("INV-1001", merged.GetProperty("invoice").GetProperty("number").GetString());
+        Assert.Equal(2, merged.GetProperty("lines").GetArrayLength());
+    }
+
     private static string CompileInvoice() =>
         ReportCompiler.Compile(ReadInvoice(), ReadInvoiceData(), new CompileOptions { Culture = Us });
 

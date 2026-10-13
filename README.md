@@ -2,7 +2,7 @@
 
 https://seeattachedreports.com
 
-Reports are the attachment. The app gets the attention, and the invoice, the statement, and the list wait until someone asks for the PDF. See Attached is an open-source builder for those documents. A report is a header, a body that flows, and a footer. Tables split by row. It is not a free canvas and not a pixel-perfect form.
+Reports are the attachment. The app gets the attention, and the invoice, the statement, and the list wait until someone asks for the PDF. See Attached is an open-source builder for those documents. A report is a header, a body that flows, and a footer. A page header and a page footer can repeat, with page numbers. Tables split by row. It is not a free canvas and not a pixel-perfect form.
 
 The file you save is JSON. HTML is only the render artifact. .NET binds the data and compiles one self-contained HTML file. A browser shows that file. Playwright prints the same HTML to PDF.
 
@@ -27,14 +27,14 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 ## What v1 does
 
 - Paper sizes A3, A4, A5, Letter, Legal, Tabloid, and custom. Portrait or landscape. Lengths are millimetres, with at most two decimal places.
-- Bands: report header, body, and report footer. Each appears once. There is no repeating page header or footer, and no "page X of Y".
-- Blocks: text, bound field, image, spacer, a row of two or three columns, and a table bound to an array.
-- Bindings are property paths (`customer.name`) and .NET numeric or date format strings. The culture is chosen when you compile. Table aggregates are Sum, Count, and Avg. Values are HTML-encoded.
+- Bands: report header, body, and report footer, each once. Page header and page footer repeat on every page. Page numbers print as "Page N of M" at the bottom left, center, or right.
+- Blocks: text, bound field, image, spacer, a row of two or three columns, and a table bound to an array. A block can show or hide from a data path. A table can group rows and carry a running total.
+- Bindings are property paths (`customer.name`) and .NET numeric or date format strings. The culture is chosen when you compile. Table aggregates are Sum, Count, and Avg, on the group or on the whole table. Values are HTML-encoded.
 - Images are `https` URLs or `data:image` PNG, JPEG, GIF, or WebP.
 - Print CSS sets `@page` size and margin, repeats a table header with `thead { display: table-header-group }`, and keeps a table row or a `keepTogether` block from splitting.
-- Screen preview is one paper-width column. Chromium inserts page breaks only when you print or export PDF. Those two views will not show the same break positions.
+- The WPF builder previews the real PDF. The Blazor and Next.js viewers show one paper-width column. Chromium inserts page breaks when that HTML is printed.
 
-Not in v1: grouping, charts, barcodes, rich text, expressions, right-to-left layout, and a measured stack of pages in the viewer.
+Not in this version: charts, barcodes, rich text, expressions, right-to-left layout, and a free canvas.
 
 ## Projects
 
@@ -50,7 +50,8 @@ Not in v1: grouping, charts, barcodes, rich text, expressions, right-to-left lay
 | `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` |
 | `fixtures/invoice` | Invoice definition and data |
 | `tests/ReportCreator.Compile.Tests` | HTML checks, no browser |
-| `tests/ReportCreator.Pdf.Tests` | PDF page size and text |
+| `tests/ReportCreator.Pdf.Tests` | Page size, text, and a table that crosses pages |
+| `Dockerfile` | Blazor sample image with Chromium installed |
 
 Libraries target `net10.0`. The builder targets `net10.0-windows`. `global.json` pins the .NET 10 SDK.
 
@@ -93,7 +94,7 @@ npm run dev
 
 `npm install` and `npm run dev` must run inside `samples/viewer-next`. Do not add a `package.json` at the repository root. Next.js 16 added `@types/node` 26.6.5 as a sample dev dependency the first time `next build` saw TypeScript. It is not used by the .NET libraries.
 
-The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, export HTML, and export PDF. Page setup edits paper, orientation, and margins. Select a block in the list or click it in the preview, then edit it in the property panel. Reorder with Up and Down. The preview is WebView2. PDF export uses the same Playwright library as the server. WebView2 needs the WebView2 runtime installed on the machine.
+The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, and page numbers. Select a block in the list and edit it in the property panel. The Data expander edits the sample JSON and can insert fields the report binds but the JSON does not have yet. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
 
 ## PDF on Azure
 
@@ -101,7 +102,14 @@ Playwright works in Azure Container Apps, Azure Container Instances, AKS, and Ap
 
 `PdfExportOptions.Container = true` launches Chromium with `--disable-dev-shm-usage` and `--no-sandbox`. Leave it off on Windows and on a normal VM. Container Apps cannot raise `/dev/shm` or install a custom seccomp profile, which is why those two flags exist. The HTML is the compiler's own output.
 
-Build the image from `mcr.microsoft.com/dotnet/aspnet:10.0` and install Chromium during the image build. The official `mcr.microsoft.com/playwright/dotnet` image is for development and may not include the .NET 10 runtime. Give the app at least 1 GB of memory, and 2 GB if several exports run at once. Keep one browser open and open a page per export.
+The repository `Dockerfile` publishes `samples/viewer-blazor` on `mcr.microsoft.com/dotnet/sdk:10.0`, then runs it on `mcr.microsoft.com/dotnet/aspnet:10.0` with Chromium installed at build time. The official `mcr.microsoft.com/playwright/dotnet` image is for development and may not include the .NET 10 runtime. Build it with Linux containers:
+
+```powershell
+docker build -t see-attached .
+docker run --rm -p 8080:8080 see-attached
+```
+
+The page is `http://localhost:8080`. The image sets `REPORTCREATOR_CONTAINER=1`, so the sample passes `PdfExportOptions.Container`. Give the app at least 1 GB of memory, and 2 GB if several exports run at once. Keep one browser open and open a page per export.
 
 ## Fonts
 

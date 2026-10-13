@@ -19,6 +19,7 @@ internal static class PropertyEditor
             block.KeepTogether = value;
             preview();
         });
+        AddShowWhen(panel, block, preview);
 
         switch (block)
         {
@@ -55,13 +56,17 @@ internal static class PropertyEditor
                 break;
             case TableBlock table:
                 AddText(panel, "Data path", table.DataPath, value => table.DataPath = value, preview, multiline: false);
+                AddText(panel, "Group by", table.GroupBy ?? "", value => table.GroupBy = Blank(value), preview, multiline: false);
                 AddCheck(panel, "Show header", table.ShowHeader, value =>
                 {
                     table.ShowHeader = value;
                     preview();
                 });
                 AddTableColumns(panel, table, preview, rebuild);
-                AddAggregates(panel, table, preview, rebuild);
+                table.GroupAggregates ??= [];
+                table.Aggregates ??= [];
+                AddAggregateList(panel, "Group totals", table.GroupAggregates, table, preview, rebuild);
+                AddAggregateList(panel, "Report totals", table.Aggregates, table, preview, rebuild);
                 break;
         }
     }
@@ -114,6 +119,11 @@ internal static class PropertyEditor
             AddText(stack, "Path", column.Path, value => column.Path = value, preview, multiline: false);
             AddText(stack, "Format", column.Format ?? "", value => column.Format = Blank(value), preview, multiline: false);
             AddAlign(stack, column.Align, value => column.Align = value, preview);
+            AddCheck(stack, "Running total", column.RunningTotal, value =>
+            {
+                column.RunningTotal = value;
+                preview();
+            });
             var remove = new Button { Content = "Remove column", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4) };
             remove.Click += (_, _) =>
             {
@@ -136,10 +146,52 @@ internal static class PropertyEditor
         panel.Children.Add(add);
     }
 
-    private static void AddAggregates(StackPanel panel, TableBlock table, Action preview, Action rebuild)
+    private static void AddShowWhen(StackPanel panel, Block block, Action preview)
     {
-        AddLabel(panel, "Aggregates");
-        foreach (var aggregate in table.Aggregates.ToList())
+        var path = new TextBox { Text = block.When?.Path ?? "", Margin = new Thickness(0, 0, 0, 8) };
+        var kind = new ComboBox
+        {
+            ItemsSource = Enum.GetValues<ShowWhenKind>(),
+            SelectedItem = block.When?.Kind ?? ShowWhenKind.NotEmpty,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var value = new TextBox { Text = block.When?.Value ?? "", Margin = new Thickness(0, 0, 0, 8) };
+        AddLabel(panel, "Show when path");
+        panel.Children.Add(path);
+        AddLabel(panel, "Show when");
+        panel.Children.Add(kind);
+        AddLabel(panel, "Compare to");
+        panel.Children.Add(value);
+
+        void Apply()
+        {
+            ShowWhen? next = null;
+            if (!string.IsNullOrWhiteSpace(path.Text))
+            {
+                next = new ShowWhen
+                {
+                    Path = path.Text.Trim(),
+                    Kind = kind.SelectedItem is ShowWhenKind selected ? selected : ShowWhenKind.NotEmpty,
+                    Value = string.IsNullOrWhiteSpace(value.Text) ? null : value.Text
+                };
+            }
+
+            if (block.When?.Path == next?.Path && block.When?.Kind == next?.Kind && block.When?.Value == next?.Value)
+                return;
+
+            block.When = next;
+            preview();
+        }
+
+        path.TextChanged += (_, _) => Apply();
+        kind.SelectionChanged += (_, _) => Apply();
+        value.TextChanged += (_, _) => Apply();
+    }
+
+    private static void AddAggregateList(StackPanel panel, string title, List<TableAggregate> aggregates, TableBlock table, Action preview, Action rebuild)
+    {
+        AddLabel(panel, title);
+        foreach (var aggregate in aggregates.ToList())
         {
             AddText(panel, "Label", aggregate.Label ?? "", value => aggregate.Label = Blank(value), preview, multiline: false);
             AddText(panel, "Column path", aggregate.ColumnPath, value => aggregate.ColumnPath = value, preview, multiline: false);
@@ -154,22 +206,22 @@ internal static class PropertyEditor
                 }
             };
             panel.Children.Add(kind);
-            var remove = new Button { Content = "Remove aggregate", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 8) };
+            var remove = new Button { Content = "Remove", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 8) };
             remove.Click += (_, _) =>
             {
-                table.Aggregates.Remove(aggregate);
+                aggregates.Remove(aggregate);
                 rebuild();
                 preview();
             };
             panel.Children.Add(remove);
         }
 
-        var add = new Button { Content = "Add sum", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4) };
+        var add = new Button { Content = "Add sum", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 12) };
         add.Click += (_, _) =>
         {
-            table.Aggregates.Add(new TableAggregate
+            aggregates.Add(new TableAggregate
             {
-                Label = "Total",
+                Label = title == "Group totals" ? "Subtotal" : "Total",
                 ColumnPath = table.Columns.FirstOrDefault()?.Path ?? "",
                 Kind = AggregateKind.Sum,
                 Format = "0.##"

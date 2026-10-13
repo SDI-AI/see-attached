@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ReportCreator.Model;
 using ReportCreator.Pdf;
@@ -48,6 +49,67 @@ public class PdfExportTests
         Assert.InRange(wideBox.Height, 611, 614);
     }
 
+    [Fact]
+    public async Task Export_SplitsALongTableAcrossPagesWithoutCuttingARow()
+    {
+        var rows = new List<object>();
+        for (var index = 1; index <= 48; index++)
+        {
+            rows.Add(index == 30
+                ? new { description = "ROW-KEEP-TOGETHER", amount = 4242 }
+                : new { description = "Line " + index.ToString(CultureInfo.InvariantCulture), amount = index });
+        }
+
+        var definition = new ReportDefinition
+        {
+            Name = "Statement",
+            Page = new PageSetup
+            {
+                PageNumbers = PageNumberPlacement.BottomCenter,
+                PageHeaderMm = 12,
+                PageFooterMm = 10
+            },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "Acme Statement" }] },
+            PageFooter = { Blocks = [new TextBlock { Id = "copy", Text = "Keep this copy" }] },
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        Columns =
+                        [
+                            new TableColumn { Header = "Description", Path = "description" },
+                            new TableColumn { Header = "Amount", Path = "amount", Align = TextAlign.Right }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { lines = rows });
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.GetCultureInfo("en-US")
+        });
+
+        var pdf = await exporter.ExportAsync(definition, data, TestContext.Current.CancellationToken);
+        var pages = ExtractPages(pdf);
+
+        Assert.True(pages.Count >= 2, "Expected the statement to fill at least two pages, got " + pages.Count + ".");
+        Assert.Contains(pages, page => page.Contains("Page 1 of", StringComparison.Ordinal));
+        Assert.Contains(pages, page => page.Contains("Page 2 of", StringComparison.Ordinal));
+        Assert.All(pages, page => Assert.Contains("Acme Statement", page, StringComparison.Ordinal));
+        Assert.All(pages, page => Assert.Contains("Description", page, StringComparison.Ordinal));
+        Assert.All(pages, page => Assert.Contains("Keep this copy", page, StringComparison.Ordinal));
+        Assert.Single(pages, page => page.Contains("ROW-KEEP-TOGETHER", StringComparison.Ordinal));
+        Assert.Contains(
+            "4242",
+            pages.Single(page => page.Contains("ROW-KEEP-TOGETHER", StringComparison.Ordinal)),
+            StringComparison.Ordinal);
+    }
+
     private static string Fixture(string name) =>
         Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice", name);
 
@@ -84,24 +146,63 @@ public class PdfExportTests
 
     // Chromium writes one subset font per face. Each face has its own ToUnicode
     // CMap, and the same glyph id means different characters in each face.
-    private static string ExtractText(byte[] pdf)
+    private static string ExtractText(byte[] pdf) => string.Concat(ExtractPages(pdf));
+
+    private static List<string> ExtractPages(byte[] pdf)
     {
         var objects = ReadObjects(pdf);
-        var text = new StringBuilder();
-        foreach (var page in objects.Values)
+        var pages = new List<string>();
+        foreach (var page in OrderedPages(objects))
         {
-            if (!Regex.IsMatch(page.Body, @"/Type\s*/Page(?!s)"))
-                continue;
-
+            var text = new StringBuilder();
             var fonts = FontMaps(objects, ResourceBody(objects, page.Body));
             foreach (var contentId in ContentIds(page.Body))
             {
                 if (objects.TryGetValue(contentId, out var content) && content.Data is not null)
                     AppendShownText(Encoding.Latin1.GetString(content.Data), fonts, text);
             }
+
+            pages.Add(text.ToString());
         }
 
-        return text.ToString();
+        return pages;
+    }
+
+    private static IEnumerable<PdfObject> OrderedPages(Dictionary<int, PdfObject> objects)
+    {
+        var catalog = objects.Values.FirstOrDefault(item => Regex.IsMatch(item.Body, @"/Type\s*/Catalog\b"));
+        var root = catalog is null ? null : Regex.Match(catalog.Body, @"/Pages\s+(?<id>\d+)\s+\d+\s+R");
+        if (root is not { Success: true }
+            || !int.TryParse(root.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var rootId))
+        {
+            return objects.Values.Where(item => Regex.IsMatch(item.Body, @"/Type\s*/Page(?!s)"));
+        }
+
+        var ordered = new List<PdfObject>();
+        WalkPages(objects, rootId, ordered);
+        return ordered;
+    }
+
+    private static void WalkPages(Dictionary<int, PdfObject> objects, int id, List<PdfObject> ordered)
+    {
+        if (!objects.TryGetValue(id, out var item))
+            return;
+        if (Regex.IsMatch(item.Body, @"/Type\s*/Pages\b"))
+        {
+            var kids = Regex.Match(item.Body, @"/Kids\s*\[(?<ids>[^\]]*)\]");
+            if (!kids.Success)
+                return;
+            foreach (Match kid in Regex.Matches(kids.Groups["ids"].Value, @"(?<id>\d+)\s+\d+\s+R"))
+            {
+                if (int.TryParse(kid.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var child))
+                    WalkPages(objects, child, ordered);
+            }
+
+            return;
+        }
+
+        if (Regex.IsMatch(item.Body, @"/Type\s*/Page(?!s)"))
+            ordered.Add(item);
     }
 
     private static Dictionary<int, PdfObject> ReadObjects(byte[] pdf)

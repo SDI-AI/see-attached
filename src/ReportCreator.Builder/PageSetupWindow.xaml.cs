@@ -23,6 +23,10 @@ public partial class PageSetupWindow : Window
         RightBox.Text = _page.Margin.Right.ToString(CultureInfo.CurrentCulture);
         BottomBox.Text = _page.Margin.Bottom.ToString(CultureInfo.CurrentCulture);
         LeftBox.Text = _page.Margin.Left.ToString(CultureInfo.CurrentCulture);
+        HeaderBox.Text = _page.PageHeaderMm.ToString(CultureInfo.CurrentCulture);
+        FooterBox.Text = _page.PageFooterMm.ToString(CultureInfo.CurrentCulture);
+        NumberBox.ItemsSource = Enum.GetValues<PageNumberPlacement>();
+        NumberBox.SelectedItem = _page.PageNumbers;
         UpdateCustom();
     }
 
@@ -43,11 +47,15 @@ public partial class PageSetupWindow : Window
             return;
 
         if (!TryMm(TopBox.Text, out var top) || !TryMm(RightBox.Text, out var right)
-            || !TryMm(BottomBox.Text, out var bottom) || !TryMm(LeftBox.Text, out var left))
+            || !TryMm(BottomBox.Text, out var bottom) || !TryMm(LeftBox.Text, out var left)
+            || !TryMm(HeaderBox.Text, out var header) || !TryMm(FooterBox.Text, out var footer))
         {
-            MessageBox.Show(this, "Margins must be numbers, in millimetres.", "Page setup");
+            MessageBox.Show(this, "Margins and page chrome heights must be numbers, in millimetres.", "Page setup");
             return;
         }
+
+        if (NumberBox.SelectedItem is not PageNumberPlacement numbers)
+            return;
 
         decimal? width = null;
         decimal? height = null;
@@ -71,6 +79,9 @@ public partial class PageSetupWindow : Window
         _page.Margin.Right = right;
         _page.Margin.Bottom = bottom;
         _page.Margin.Left = left;
+        _page.PageHeaderMm = header;
+        _page.PageFooterMm = footer;
+        _page.PageNumbers = numbers;
 
         var errors = ReportValidator.Validate(new ReportDefinition { Name = "Page", Page = _page });
         if (errors.Count > 0)
@@ -98,6 +109,9 @@ public partial class PageSetupWindow : Window
             Right = page.Margin.Right,
             Bottom = page.Margin.Bottom,
             Left = page.Margin.Left
-        }
+        },
+        PageHeaderMm = page.PageHeaderMm,
+        PageFooterMm = page.PageFooterMm,
+        PageNumbers = page.PageNumbers
     };
 }

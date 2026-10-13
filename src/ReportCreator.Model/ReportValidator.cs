@@ -20,16 +20,25 @@ public static class ReportValidator
         else
             ValidatePage(definition.Page, errors);
 
-        if (definition.Header is null || definition.Body is null || definition.Footer is null)
-        {
-            errors.Add("Header, body, and footer are required.");
-            return errors;
-        }
+        definition.Header ??= new Band();
+        definition.Body ??= new Band();
+        definition.Footer ??= new Band();
+        definition.PageHeader ??= new Band();
+        definition.PageFooter ??= new Band();
+        definition.Header.Blocks ??= [];
+        definition.Body.Blocks ??= [];
+        definition.Footer.Blocks ??= [];
+        definition.PageHeader.Blocks ??= [];
+        definition.PageFooter.Blocks ??= [];
 
         var ids = new HashSet<string>(StringComparer.Ordinal);
         ValidateBand(definition.Header, "Header", errors, ids, insideColumns: false);
         ValidateBand(definition.Body, "Body", errors, ids, insideColumns: false);
         ValidateBand(definition.Footer, "Footer", errors, ids, insideColumns: false);
+        ValidateBand(definition.PageHeader, "Page header", errors, ids, insideColumns: false);
+        ValidateBand(definition.PageFooter, "Page footer", errors, ids, insideColumns: false);
+        if (definition.Page is not null && definition.Page.Margin is not null && errors.All(error => !error.Contains("no room for content", StringComparison.Ordinal)))
+            ValidateChromeRoom(definition, errors);
         return errors;
     }
 
@@ -56,6 +65,10 @@ public static class ReportValidator
         RequireMm(page.Margin.Right, "Right margin", errors, positive: false);
         RequireMm(page.Margin.Bottom, "Bottom margin", errors, positive: false);
         RequireMm(page.Margin.Left, "Left margin", errors, positive: false);
+        RequireMm(page.PageHeaderMm, "Page header height", errors, positive: false);
+        RequireMm(page.PageFooterMm, "Page footer height", errors, positive: false);
+        if (!Enum.IsDefined(page.PageNumbers))
+            errors.Add("The page number placement is not recognized.");
 
         if (page.Paper == PaperKind.Custom && (page.CustomWidthMm is null or <= 0 || page.CustomHeightMm is null or <= 0))
             return;
@@ -65,6 +78,15 @@ public static class ReportValidator
             errors.Add("The left and right margins leave no room for content.");
         if (page.Margin.Top + page.Margin.Bottom >= size.HeightMm)
             errors.Add("The top and bottom margins leave no room for content.");
+    }
+
+    private static void ValidateChromeRoom(ReportDefinition definition, List<string> errors)
+    {
+        var page = definition.Page;
+        var size = PaperCatalog.Resolve(page);
+        var used = page.Margin.Top + page.Margin.Bottom + PageMetrics.Header(definition) + PageMetrics.Footer(definition) + PageMetrics.Numbers(page);
+        if (used >= size.HeightMm)
+            errors.Add("The page header, page footer, page numbers, and margins leave no room for content.");
     }
 
     private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, bool insideColumns)
@@ -81,6 +103,17 @@ public static class ReportValidator
             errors.Add($"Block id '{block.Id}' is used more than once.");
 
         var where = $"{scope} block '{block.Id}'";
+        if (block.When is { } when)
+        {
+            if (!StyleRules.IsBindingPath(when.Path))
+                errors.Add($"{where} show-when needs a binding path such as customer.name.");
+            if (!Enum.IsDefined(when.Kind))
+                errors.Add($"{where} show-when comparison is not recognized.");
+            if (when.Kind is ShowWhenKind.Equals or ShowWhenKind.NotEquals or ShowWhenKind.GreaterThan or ShowWhenKind.LessThan
+                && string.IsNullOrWhiteSpace(when.Value))
+                errors.Add($"{where} show-when needs a comparison value.");
+        }
+
         switch (block)
         {
             case TextBlock text:
@@ -119,8 +152,11 @@ public static class ReportValidator
             case TableBlock table:
                 if (!StyleRules.IsBindingPath(table.DataPath))
                     errors.Add($"{where} needs a data path for its rows.");
+                if (!string.IsNullOrWhiteSpace(table.GroupBy) && !StyleRules.IsBindingPath(table.GroupBy))
+                    errors.Add($"{where} group path must look like customer.name.");
                 if (table.Columns.Count == 0)
                     errors.Add($"{where} needs at least one column.");
+                table.GroupAggregates ??= [];
                 foreach (var column in table.Columns)
                 {
                     if (string.IsNullOrWhiteSpace(column.Header) || column.Header.Length > 200)
@@ -131,7 +167,7 @@ public static class ReportValidator
                     RequireMm(column.WidthMm, $"{where} column width", errors, positive: true, allowNull: true);
                 }
 
-                foreach (var aggregate in table.Aggregates)
+                foreach (var aggregate in table.Aggregates.Concat(table.GroupAggregates))
                 {
                     if (table.Columns.All(column => column.Path != aggregate.ColumnPath))
                         errors.Add($"{where} aggregate points at '{aggregate.ColumnPath}', which is not a column.");

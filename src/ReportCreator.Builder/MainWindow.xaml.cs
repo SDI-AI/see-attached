@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using ReportCreator.Compile;
@@ -17,16 +18,22 @@ public partial class MainWindow : Window
 {
     private const string TinyPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
+    private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private ReportDefinition _definition = new();
     private JsonElement _data = JsonSerializer.SerializeToElement(new { });
     private string? _path;
+    private string? _previewFile;
+    private Task<ReportPdfExporter>? _launch;
+    private int _previewVersion;
     private bool _webReady;
     private bool _suppress;
+    private bool _suppressData;
     private bool _busy;
 
     public MainWindow()
     {
         InitializeComponent();
+        _previewTimer.Tick += PreviewTick;
         LoadNew();
     }
 
@@ -37,12 +44,24 @@ public partial class MainWindow : Window
             await Preview.EnsureCoreWebView2Async();
             Preview.CoreWebView2.WebMessageReceived += WebMessageReceived;
             _webReady = true;
-            RenderPreview();
+            SchedulePreview();
         }
         catch (Exception exception)
         {
             Status.Text = "WebView2 did not start. Install the WebView2 runtime. " + exception.Message;
         }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _previewTimer.Stop();
+        _previewVersion++;
+        var launch = _launch;
+        _launch = null;
+        if (launch is not null)
+            _ = DisposeExporter(launch);
+        TryDelete(_previewFile);
+        base.OnClosed(e);
     }
 
     private void WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -58,17 +77,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void New_Click(object sender, RoutedEventArgs e)
-    {
-        LoadNew();
-        RenderPreview();
-    }
+    private void New_Click(object sender, RoutedEventArgs e) => LoadNew();
 
     private void Sample_Click(object sender, RoutedEventArgs e)
     {
         _path = null;
         _definition = ReportJson.Read(ReadEmbedded("invoice.definition.json"));
-        _data = ReportJson.ReadData(ReadEmbedded("invoice.data.json"));
+        SetData(ReportJson.ReadData(ReadEmbedded("invoice.data.json")));
         Normalize(_definition);
         Title = "See Attached — Invoice";
         RefreshList(_definition.Body.Blocks.FirstOrDefault()?.Id);
@@ -106,8 +121,8 @@ public partial class MainWindow : Window
 
         try
         {
-            _data = ReportJson.ReadData(File.ReadAllText(dialog.FileName));
-            RenderPreview();
+            SetData(ReportJson.ReadData(File.ReadAllText(dialog.FileName)));
+            SchedulePreview();
             Status.Text = "Preview data loaded.";
         }
         catch (Exception exception)
@@ -188,7 +203,40 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             _definition.Page = dialog.Page;
-            RenderPreview();
+            SchedulePreview();
+        }
+    }
+
+    private void FillData_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SetData(ReportBindings.MergeMissing(_data, ReportBindings.Sample(_definition)));
+            SchedulePreview();
+            Status.Text = "Missing fields inserted. Existing values were kept.";
+        }
+        catch (Exception exception)
+        {
+            Status.Text = exception.Message;
+        }
+    }
+
+    private void DataBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_suppressData)
+            return;
+
+        try
+        {
+            var data = ReportJson.ReadData(DataBox.Text);
+            if (JsonSerializer.Serialize(data, ReportJson.Options) == JsonSerializer.Serialize(_data, ReportJson.Options))
+                return;
+            _data = data;
+            SchedulePreview();
+        }
+        catch (JsonException exception)
+        {
+            Status.Text = exception.Message;
         }
     }
 
@@ -217,14 +265,13 @@ public partial class MainWindow : Window
         if (_suppress)
             return;
         ShowProperties();
-        RenderPreview();
     }
 
     private void LoadNew()
     {
         _path = null;
-        _data = JsonSerializer.SerializeToElement(new { });
         _definition = new ReportDefinition();
+        SetData(JsonSerializer.SerializeToElement(new { }));
         _definition.Header.Blocks.Add(new ModelText { Id = NewId(), Text = "Report", Bold = true, FontSizePt = 22 });
         Title = "See Attached";
         RefreshList(_definition.Header.Blocks[0].Id);
@@ -253,7 +300,6 @@ public partial class MainWindow : Window
         BlockList.SelectedItem = site;
         _suppress = false;
         ShowProperties();
-        RenderPreview();
     }
 
     private void RefreshList(string? selectId)
@@ -264,7 +310,7 @@ public partial class MainWindow : Window
         BlockList.SelectedItem = selectId is null ? null : sites.FirstOrDefault(site => site.Block.Id == selectId);
         _suppress = false;
         ShowProperties();
-        RenderPreview();
+        SchedulePreview();
     }
 
     private void ShowProperties()
@@ -272,25 +318,110 @@ public partial class MainWindow : Window
         Properties.Children.Clear();
         if (Selected()?.Block is not Block block)
             return;
-        PropertyEditor.Fill(Properties, block, RenderPreview, () =>
+        PropertyEditor.Fill(Properties, block, SchedulePreview, () =>
         {
             var id = block.Id;
             Dispatcher.BeginInvoke(() => RefreshList(id));
         });
     }
 
-    private void RenderPreview()
+    private void SchedulePreview()
     {
         if (!_webReady)
             return;
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private async void PreviewTick(object? sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        await RenderPreviewAsync();
+    }
+
+    private async Task RenderPreviewAsync()
+    {
+        if (!_webReady)
+            return;
+
+        var version = ++_previewVersion;
+        if (!_busy)
+            Status.Text = "Updating pages…";
+
         try
         {
-            Preview.NavigateToString(Compile(design: true));
-            Status.Text = _definition.Name;
+            var exporter = await ExporterAsync();
+            if (version != _previewVersion)
+                return;
+
+            var bytes = await exporter.ExportAsync(_definition, _data);
+            if (version != _previewVersion)
+                return;
+
+            var path = Path.Combine(Path.GetTempPath(), "see-attached-" + Guid.NewGuid().ToString("N") + ".pdf");
+            await File.WriteAllBytesAsync(path, bytes);
+            if (version != _previewVersion)
+            {
+                TryDelete(path);
+                return;
+            }
+
+            var previous = _previewFile;
+            _previewFile = path;
+            Preview.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+            TryDelete(previous);
+            if (!_busy)
+                Status.Text = _definition.Name;
         }
-        catch (ReportValidationException exception)
+        catch (Exception exception)
         {
-            Status.Text = exception.Errors[0];
+            if (version != _previewVersion)
+                return;
+            Status.Text = exception is ReportValidationException validation
+                ? validation.Errors[0]
+                : exception.GetBaseException().Message;
+        }
+    }
+
+    private Task<ReportPdfExporter> ExporterAsync()
+    {
+        if (_launch is null || _launch.IsFaulted || _launch.IsCanceled)
+            _launch = ReportPdfExporter.LaunchAsync();
+        return _launch;
+    }
+
+    private static async Task DisposeExporter(Task<ReportPdfExporter> launch)
+    {
+        try
+        {
+            await (await launch).DisposeAsync();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void SetData(JsonElement data)
+    {
+        _data = data;
+        _suppressData = true;
+        DataBox.Text = JsonSerializer.Serialize(data, ReportJson.Options);
+        _suppressData = false;
+    }
+
+    private static void TryDelete(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 
@@ -334,6 +465,8 @@ public partial class MainWindow : Window
     {
         0 => _definition.Header,
         2 => _definition.Footer,
+        3 => _definition.PageHeader,
+        4 => _definition.PageFooter,
         _ => _definition.Body
     };
 
@@ -342,9 +475,11 @@ public partial class MainWindow : Window
     private List<BlockSite> Flatten()
     {
         var sites = new List<BlockSite>();
+        Walk(_definition.PageHeader.Blocks, "Page header", 0, sites);
         Walk(_definition.Header.Blocks, "Header", 0, sites);
         Walk(_definition.Body.Blocks, "Body", 0, sites);
         Walk(_definition.Footer.Blocks, "Footer", 0, sites);
+        Walk(_definition.PageFooter.Blocks, "Page footer", 0, sites);
         return sites;
     }
 
@@ -385,9 +520,13 @@ public partial class MainWindow : Window
         definition.Header ??= new Band();
         definition.Body ??= new Band();
         definition.Footer ??= new Band();
+        definition.PageHeader ??= new Band();
+        definition.PageFooter ??= new Band();
         definition.Header.Blocks ??= [];
         definition.Body.Blocks ??= [];
         definition.Footer.Blocks ??= [];
+        definition.PageHeader.Blocks ??= [];
+        definition.PageFooter.Blocks ??= [];
     }
 
     private static ReportDefinition ReadPackage(string path)

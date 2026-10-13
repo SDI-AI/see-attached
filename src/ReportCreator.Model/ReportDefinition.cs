@@ -15,6 +15,10 @@ public sealed class ReportDefinition
     public Band Body { get; set; } = new();
 
     public Band Footer { get; set; } = new();
+
+    public Band PageHeader { get; set; } = new();
+
+    public Band PageFooter { get; set; } = new();
 }
 
 public sealed class PageSetup
@@ -28,6 +32,12 @@ public sealed class PageSetup
     public decimal? CustomHeightMm { get; set; }
 
     public Margin Margin { get; set; } = new();
+
+    public decimal PageHeaderMm { get; set; }
+
+    public decimal PageFooterMm { get; set; }
+
+    public PageNumberPlacement PageNumbers { get; set; } = PageNumberPlacement.None;
 }
 
 public sealed class Margin

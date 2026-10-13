@@ -35,6 +35,8 @@
                         <ComboBoxItem Content="Header" />
                         <ComboBoxItem Content="Body" />
                         <ComboBoxItem Content="Footer" />
+                        <ComboBoxItem Content="Page header" />
+                        <ComboBoxItem Content="Page footer" />
                     </ComboBox>
                     <StackPanel Orientation="Horizontal">
                         <ComboBox x:Name="AddKind" Width="150" SelectedIndex="0">
@@ -56,9 +58,17 @@
                 <ListBox x:Name="BlockList" DisplayMemberPath="Label" SelectionChanged="BlockList_SelectionChanged" />
             </DockPanel>
             <wv2:WebView2 x:Name="Preview" Grid.Column="1" />
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="Properties" Margin="8" />
-            </ScrollViewer>
+            <DockPanel Grid.Column="2" Margin="8">
+                <Expander Header="Data" DockPanel.Dock="Top" IsExpanded="False" Margin="0,0,0,8">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Bottom" Content="Insert missing fields" HorizontalAlignment="Left" Padding="8,4" Margin="0,8,0,0" Click="FillData_Click" />
+                        <TextBox x:Name="DataBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="140" VerticalScrollBarVisibility="Auto" LostFocus="DataBox_LostFocus" />
+                    </DockPanel>
+                </Expander>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="Properties" />
+                </ScrollViewer>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </Window>

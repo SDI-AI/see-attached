@@ -18,6 +18,9 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Paper" />
         <ComboBox x:Name="PaperBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" SelectionChanged="PaperBox_SelectionChanged" />
@@ -35,7 +38,13 @@
         <TextBox x:Name="BottomBox" Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" />
         <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Left margin" />
         <TextBox x:Name="LeftBox" Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" />
-        <StackPanel Grid.Row="8" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+        <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="Page header" />
+        <TextBox x:Name="HeaderBox" Grid.Row="8" Grid.Column="1" Margin="0,0,0,8" />
+        <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="Page footer" />
+        <TextBox x:Name="FooterBox" Grid.Row="9" Grid.Column="1" Margin="0,0,0,8" />
+        <TextBlock Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Text="Page numbers" />
+        <ComboBox x:Name="NumberBox" Grid.Row="10" Grid.Column="1" Margin="0,0,0,8" />
+        <StackPanel Grid.Row="11" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" IsCancel="True" Padding="12,4" Margin="0,0,8,0" />
             <Button Content="OK" IsDefault="True" Padding="12,4" Click="Ok_Click" />
         </StackPanel>
