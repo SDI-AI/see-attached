@@ -4,6 +4,100 @@
              xmlns:local="clr-namespace:ReportCreator.Builder"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <SolidColorBrush x:Key="Ink" Color="#171717" />
+        <SolidColorBrush x:Key="Paper" Color="#F7F4EE" />
+        <SolidColorBrush x:Key="Canvas" Color="#E8E6DF" />
+        <SolidColorBrush x:Key="Blue" Color="#2457FF" />
+        <SolidColorBrush x:Key="Acid" Color="#E9FF72" />
+        <SolidColorBrush x:Key="Line" Color="#D9D6CE" />
+        <SolidColorBrush x:Key="Muted" Color="#6F6A62" />
+        <SolidColorBrush x:Key="Wash" Color="#E7ECFF" />
+        <SolidColorBrush x:Key="Card" Color="#FFFFFF" />
+
+        <Style x:Key="Eyebrow" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="Margin" Value="2,0,0,12" />
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Ink}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,10,0,4" />
+        </Style>
+
+        <Style x:Key="FieldBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource Card}" />
+            <Setter Property="Foreground" Value="{StaticResource Ink}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style x:Key="FieldCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource Card}" />
+            <Setter Property="Foreground" Value="{StaticResource Ink}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style x:Key="QuietButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource Ink}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{StaticResource Acid}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToolLink" TargetType="Button" BasedOn="{StaticResource QuietButton}">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="2,0" />
+        </Style>
+
+        <Style x:Key="InkButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Ink}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{StaticResource Blue}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

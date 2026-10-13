@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
@@ -41,6 +42,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            Preview.DefaultBackgroundColor = System.Drawing.Color.FromArgb(232, 230, 223);
             await Preview.EnsureCoreWebView2Async();
             Preview.CoreWebView2.WebMessageReceived += WebMessageReceived;
             _webReady = true;
@@ -85,7 +87,7 @@ public partial class MainWindow : Window
         _definition = ReportJson.Read(ReadEmbedded("invoice.definition.json"));
         SetData(ReportJson.ReadData(ReadEmbedded("invoice.data.json")));
         Normalize(_definition);
-        Title = "See Attached — Invoice";
+        UpdateChrome();
         RefreshList(_definition.Body.Blocks.FirstOrDefault()?.Id);
         Status.Text = "Invoice sample. Data is loaded for preview only.";
     }
@@ -103,7 +105,7 @@ public partial class MainWindow : Window
                 : ReportJson.Read(File.ReadAllText(dialog.FileName));
             Normalize(_definition);
             _path = dialog.FileName;
-            Title = "See Attached — " + _definition.Name;
+            UpdateChrome();
             RefreshList(null);
             Status.Text = "Opened " + dialog.FileName;
         }
@@ -273,7 +275,7 @@ public partial class MainWindow : Window
         _definition = new ReportDefinition();
         SetData(JsonSerializer.SerializeToElement(new { }));
         _definition.Header.Blocks.Add(new ModelText { Id = NewId(), Text = "Report", Bold = true, FontSizePt = 22 });
-        Title = "See Attached";
+        UpdateChrome();
         RefreshList(_definition.Header.Blocks[0].Id);
         Status.Text = "New report.";
     }
@@ -291,9 +293,7 @@ public partial class MainWindow : Window
 
     private void Select(string id)
     {
-        if (BlockList.ItemsSource is not IEnumerable<BlockSite> sites)
-            return;
-        var site = sites.FirstOrDefault(item => item.Block.Id == id);
+        var site = Sites().FirstOrDefault(item => item.Block.Id == id);
         if (site is null || Selected()?.Block.Id == id)
             return;
         _suppress = true;
@@ -305,8 +305,10 @@ public partial class MainWindow : Window
     private void RefreshList(string? selectId)
     {
         var sites = Flatten();
+        var view = new ListCollectionView(sites);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BlockSite.Band)));
         _suppress = true;
-        BlockList.ItemsSource = sites;
+        BlockList.ItemsSource = view;
         BlockList.SelectedItem = selectId is null ? null : sites.FirstOrDefault(site => site.Block.Id == selectId);
         _suppress = false;
         ShowProperties();
@@ -317,7 +319,12 @@ public partial class MainWindow : Window
     {
         Properties.Children.Clear();
         if (Selected()?.Block is not Block block)
+        {
+            PropertiesHeading.Text = "PROPERTIES";
             return;
+        }
+
+        PropertiesHeading.Text = "PROPERTIES / " + PropertyEditor.Kind(block).ToUpperInvariant();
         PropertyEditor.Fill(Properties, block, SchedulePreview, () =>
         {
             var id = block.Id;
@@ -368,10 +375,10 @@ public partial class MainWindow : Window
 
             var previous = _previewFile;
             _previewFile = path;
-            Preview.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+            Preview.CoreWebView2.Navigate(new Uri(path).AbsoluteUri + "#toolbar=0&navpanes=0");
             TryDelete(previous);
-            if (!_busy)
-                Status.Text = _definition.Name;
+            if (!_busy && Status.Text == "Updating pages…")
+                Status.Text = "Ready";
         }
         catch (Exception exception)
         {
@@ -457,9 +464,21 @@ public partial class MainWindow : Window
         }
 
         _path = path;
-        Title = "See Attached — " + _definition.Name;
+        UpdateChrome();
         Status.Text = "Saved " + path;
     }
+
+    private void UpdateChrome()
+    {
+        var place = _path is null ? "unsaved" : Path.GetFileName(_path);
+        DocumentLabel.Text = _definition.Name + "  /  " + place;
+        Title = "See Attached — " + _definition.Name;
+    }
+
+    private IEnumerable<BlockSite> Sites() =>
+        BlockList.ItemsSource is System.ComponentModel.ICollectionView view
+            ? view.OfType<BlockSite>()
+            : BlockList.ItemsSource as IEnumerable<BlockSite> ?? [];
 
     private Band BandForAdd() => AddBand.SelectedIndex switch
     {
@@ -548,7 +567,30 @@ public partial class MainWindow : Window
 
     private sealed record BlockSite(List<Block> Parent, int Index, string Band, int Depth, Block Block)
     {
-        public string Label => new string(' ', Depth * 2) + Band + "  " + PropertyEditor.Kind(Block) + "  " + Block.Id;
+        public string KindLabel => PropertyEditor.Kind(Block);
+
+        public string Summary => Block switch
+        {
+            ModelText text => FirstLine(text.Text),
+            FieldBlock bound => bound.Path,
+            ImageBlock image => string.IsNullOrWhiteSpace(image.Alt) ? "Image" : FirstLine(image.Alt),
+            SpacerBlock spacer => spacer.HeightMm.ToString(System.Globalization.CultureInfo.CurrentCulture) + " mm",
+            ColumnsBlock columns => columns.Columns.Count + (columns.Columns.Count == 1 ? " column" : " columns"),
+            TableBlock table => table.DataPath,
+            _ => ""
+        };
+
+        public string Slash => string.IsNullOrWhiteSpace(Summary) ? "" : " / ";
+
+        public Thickness CardMargin => new(Depth * 18, 0, 0, 0);
+
+        public override string ToString() => KindLabel + Slash + Summary;
+
+        private static string FirstLine(string text)
+        {
+            var line = text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
+            return line.Length <= 32 ? line : line[..31] + "…";
+        }
     }
 
     private sealed record SelectMessage(string? Type, string? Id);

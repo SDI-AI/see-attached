@@ -85,18 +85,13 @@ internal static class PropertyEditor
     private static void AddColumnTools(StackPanel panel, ColumnsBlock columns, Action preview, Action rebuild)
     {
         AddLabel(panel, $"{columns.Columns.Count} columns");
-        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Spacer" }, SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 8) };
+        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Spacer" }, SelectedIndex = 0 };
+        Use(kind, "FieldCombo");
         panel.Children.Add(kind);
         for (var index = 0; index < columns.Columns.Count; index++)
         {
             var columnIndex = index;
-            var button = new Button
-            {
-                Content = $"Add to column {index + 1}",
-                Margin = new Thickness(0, 0, 0, 8),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Padding = new Thickness(8, 4, 8, 4)
-            };
+            var button = Quiet($"Add to column {index + 1}");
             button.Click += (_, _) =>
             {
                 var child = NewBlock(kind.SelectedItem as string ?? "Text");
@@ -113,7 +108,15 @@ internal static class PropertyEditor
         AddLabel(panel, "Columns");
         foreach (var column in table.Columns.ToList())
         {
-            var box = new Border { BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(1), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 8) };
+            var box = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xD6, 0xCE)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(10),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
             var stack = new StackPanel();
             AddText(stack, "Header", column.Header, value => column.Header = value, preview, multiline: false);
             AddText(stack, "Path", column.Path, value => column.Path = value, preview, multiline: false);
@@ -124,7 +127,7 @@ internal static class PropertyEditor
                 column.RunningTotal = value;
                 preview();
             });
-            var remove = new Button { Content = "Remove column", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4) };
+            var remove = Quiet("Remove column");
             remove.Click += (_, _) =>
             {
                 table.Columns.Remove(column);
@@ -136,7 +139,7 @@ internal static class PropertyEditor
             panel.Children.Add(box);
         }
 
-        var add = new Button { Content = "Add column", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 12) };
+        var add = Quiet("Add column");
         add.Click += (_, _) =>
         {
             table.Columns.Add(new TableColumn { Header = "Column", Path = "value" });
@@ -148,14 +151,16 @@ internal static class PropertyEditor
 
     private static void AddShowWhen(StackPanel panel, Block block, Action preview)
     {
-        var path = new TextBox { Text = block.When?.Path ?? "", Margin = new Thickness(0, 0, 0, 8) };
+        var path = new TextBox { Text = block.When?.Path ?? "" };
         var kind = new ComboBox
         {
             ItemsSource = Enum.GetValues<ShowWhenKind>(),
-            SelectedItem = block.When?.Kind ?? ShowWhenKind.NotEmpty,
-            Margin = new Thickness(0, 0, 0, 8)
+            SelectedItem = block.When?.Kind ?? ShowWhenKind.NotEmpty
         };
-        var value = new TextBox { Text = block.When?.Value ?? "", Margin = new Thickness(0, 0, 0, 8) };
+        var value = new TextBox { Text = block.When?.Value ?? "" };
+        Use(path, "FieldBox");
+        Use(kind, "FieldCombo");
+        Use(value, "FieldBox");
         AddLabel(panel, "Show when path");
         panel.Children.Add(path);
         AddLabel(panel, "Show when");
@@ -196,7 +201,8 @@ internal static class PropertyEditor
             AddText(panel, "Label", aggregate.Label ?? "", value => aggregate.Label = Blank(value), preview, multiline: false);
             AddText(panel, "Column path", aggregate.ColumnPath, value => aggregate.ColumnPath = value, preview, multiline: false);
             AddText(panel, "Format", aggregate.Format ?? "", value => aggregate.Format = Blank(value), preview, multiline: false);
-            var kind = new ComboBox { ItemsSource = Enum.GetValues<AggregateKind>(), SelectedItem = aggregate.Kind, Margin = new Thickness(0, 0, 0, 8) };
+            var kind = new ComboBox { ItemsSource = Enum.GetValues<AggregateKind>(), SelectedItem = aggregate.Kind };
+            Use(kind, "FieldCombo");
             kind.SelectionChanged += (_, _) =>
             {
                 if (kind.SelectedItem is AggregateKind value)
@@ -206,7 +212,7 @@ internal static class PropertyEditor
                 }
             };
             panel.Children.Add(kind);
-            var remove = new Button { Content = "Remove", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 8) };
+            var remove = Quiet("Remove");
             remove.Click += (_, _) =>
             {
                 aggregates.Remove(aggregate);
@@ -216,7 +222,7 @@ internal static class PropertyEditor
             panel.Children.Add(remove);
         }
 
-        var add = new Button { Content = "Add sum", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 12) };
+        var add = Quiet("Add sum");
         add.Click += (_, _) =>
         {
             aggregates.Add(new TableAggregate
@@ -257,7 +263,8 @@ internal static class PropertyEditor
     private static void AddAlign(StackPanel panel, TextAlign align, Action<TextAlign> set, Action preview)
     {
         AddLabel(panel, "Align");
-        var box = new ComboBox { ItemsSource = Enum.GetValues<TextAlign>(), SelectedItem = align, Margin = new Thickness(0, 0, 0, 8) };
+        var box = new ComboBox { ItemsSource = Enum.GetValues<TextAlign>(), SelectedItem = align };
+        Use(box, "FieldCombo");
         box.SelectionChanged += (_, _) =>
         {
             if (box.SelectedItem is TextAlign value)
@@ -278,8 +285,8 @@ internal static class PropertyEditor
             AcceptsReturn = multiline,
             TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
             MinHeight = multiline ? 72 : 0,
-            Margin = new Thickness(0, 0, 0, 8)
         };
+        Use(box, "FieldBox");
         box.TextChanged += (_, _) =>
         {
             set(box.Text);
@@ -291,7 +298,8 @@ internal static class PropertyEditor
     private static void AddMm(StackPanel panel, string label, decimal value, Action<decimal> set, Action preview)
     {
         AddLabel(panel, label);
-        var box = new TextBox { Text = value.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(0, 0, 0, 8) };
+        var box = new TextBox { Text = value.ToString(CultureInfo.CurrentCulture) };
+        Use(box, "FieldBox");
         box.LostFocus += (_, _) =>
         {
             if (TryMm(box.Text, out var parsed))
@@ -311,7 +319,8 @@ internal static class PropertyEditor
     private static void AddOptionalMm(StackPanel panel, string label, decimal? value, Action<decimal?> set, Action preview)
     {
         AddLabel(panel, label);
-        var box = new TextBox { Text = value?.ToString(CultureInfo.CurrentCulture) ?? "", Margin = new Thickness(0, 0, 0, 8) };
+        var box = new TextBox { Text = value?.ToString(CultureInfo.CurrentCulture) ?? "" };
+        Use(box, "FieldBox");
         box.LostFocus += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(box.Text))
@@ -338,7 +347,7 @@ internal static class PropertyEditor
 
     private static void AddCheck(StackPanel panel, string label, bool value, Action<bool> set)
     {
-        var box = new CheckBox { Content = label, IsChecked = value, Margin = new Thickness(0, 0, 0, 8) };
+        var box = new CheckBox { Content = label, IsChecked = value, Margin = new Thickness(0, 4, 0, 8), Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x17, 0x17)) };
         box.Checked += (_, _) => set(true);
         box.Unchecked += (_, _) => set(false);
         panel.Children.Add(box);
@@ -347,11 +356,30 @@ internal static class PropertyEditor
     private static void AddReadOnly(StackPanel panel, string label, string value)
     {
         AddLabel(panel, label);
-        panel.Children.Add(new TextBox { Text = value, IsReadOnly = true, Margin = new Thickness(0, 0, 0, 8) });
+        var box = new TextBox { Text = value, IsReadOnly = true };
+        Use(box, "FieldBox");
+        panel.Children.Add(box);
     }
 
-    private static void AddLabel(Panel panel, string text) =>
-        panel.Children.Add(new System.Windows.Controls.TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 4) });
+    private static void AddLabel(Panel panel, string text)
+    {
+        var label = new System.Windows.Controls.TextBlock { Text = text };
+        Use(label, "FieldLabel");
+        panel.Children.Add(label);
+    }
+
+    private static Button Quiet(string content)
+    {
+        var button = new Button { Content = content, Margin = new Thickness(0, 0, 0, 8) };
+        Use(button, "QuietButton");
+        return button;
+    }
+
+    private static void Use(FrameworkElement element, string key)
+    {
+        if (Application.Current?.TryFindResource(key) is Style style)
+            element.Style = style;
+    }
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
