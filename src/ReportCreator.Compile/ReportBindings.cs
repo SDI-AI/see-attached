@@ -49,6 +49,9 @@ public static partial class ReportBindings
         var root = new Node();
         foreach (var binding in List(definition))
         {
+            if (PrintPaths.IsPrintField(binding.Path) || PrintPaths.TryParameterName(binding.Path, out _))
+                continue;
+
             switch (binding.Kind)
             {
                 case ReportBindingKind.Table:

@@ -19,6 +19,8 @@ public static partial class ReportCompiler
             throw new ReportValidationException(errors);
 
         options ??= new CompileOptions();
+        if (options.Parameters.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null or JsonValueKind.Object))
+            throw new ArgumentException("Report parameters must be a JSON object keyed by parameter name.");
         if (data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
             data = JsonSerializer.SerializeToElement(new { });
 
@@ -34,7 +36,7 @@ public static partial class ReportCompiler
             .Append(Encode(definition.Name))
             .Append("</title><style>")
             .Append(FontFaces.Value)
-            .Append(SheetCss(size, margin, headerMm, footerMm, numberMm, definition.Page.PageNumbers))
+            .Append(SheetCss(size, margin, headerMm, footerMm, numberMm, definition.Page.PageNumbers, definition.Page.OmitPageNumberOnFirstPage))
             .Append("</style></head><body");
         if (options.DesignMode)
             html.Append(" class=\"design\"");
@@ -42,17 +44,17 @@ public static partial class ReportCompiler
         if (headerMm > 0)
         {
             html.Append("<header class=\"page-chrome page-header\">");
-            RenderBand(html, definition.PageHeader, data, options);
+            RenderBand(html, definition.PageHeader, definition, data, options);
             html.Append("</header>");
         }
 
-        RenderBand(html, definition.Header, data, options);
-        RenderBand(html, definition.Body, data, options);
-        RenderBand(html, definition.Footer, data, options);
+        RenderBand(html, definition.Header, definition, data, options);
+        RenderBand(html, definition.Body, definition, data, options);
+        RenderBand(html, definition.Footer, definition, data, options);
         if (footerMm > 0)
         {
             html.Append("<footer class=\"page-chrome page-footer\">");
-            RenderBand(html, definition.PageFooter, data, options);
+            RenderBand(html, definition.PageFooter, definition, data, options);
             html.Append("</footer>");
         }
 
@@ -63,20 +65,20 @@ public static partial class ReportCompiler
         return html.ToString();
     }
 
-    private static void RenderBand(StringBuilder html, Band band, JsonElement data, CompileOptions options)
+    private static void RenderBand(StringBuilder html, Band band, ReportDefinition definition, JsonElement data, CompileOptions options)
     {
         if (band.Blocks.Count == 0)
             return;
 
         html.Append("<section class=\"band\">");
         foreach (var block in band.Blocks)
-            RenderBlock(html, block, data, options);
+            RenderBlock(html, block, definition, data, options);
         html.Append("</section>");
     }
 
-    private static void RenderBlock(StringBuilder html, Block block, JsonElement data, CompileOptions options)
+    private static void RenderBlock(StringBuilder html, Block block, ReportDefinition definition, JsonElement data, CompileOptions options)
     {
-        if (!IsShown(block, data))
+        if (!IsShown(block, definition, data, options))
             return;
 
         var selected = block.Id == options.SelectedId ? " rc-selected" : "";
@@ -89,13 +91,11 @@ public static partial class ReportCompiler
                     .Append("\" data-id=\"").Append(Encode(text.Id))
                     .Append("\" style=\"").Append(StyleOf(text.FontSizePt, text.Bold, text.Color, text.Align))
                     .Append("\">")
-                    .Append(Expand(text.Text, data, options.Culture))
+                    .Append(Expand(text.Text, definition, data, options))
                     .Append("</div>");
                 break;
             case FieldBlock field:
-                var fieldText = DataValues.TryResolve(data, field.Path, out var fieldValue)
-                    ? DataValues.Format(fieldValue, field.Format, options.Culture)
-                    : "";
+                var fieldText = ResolveText(field.Path, field.Format, definition, data, options);
                 html.Append("<div class=\"block")
                     .Append(keep).Append(selected)
                     .Append("\" data-id=\"").Append(Encode(field.Id))
@@ -137,7 +137,7 @@ public static partial class ReportCompiler
                 {
                     html.Append("<div class=\"col\">");
                     foreach (var child in column.Blocks)
-                        RenderBlock(html, child, data, options);
+                        RenderBlock(html, child, definition, data, options);
                     html.Append("</div>");
                 }
                 html.Append("</div>");
@@ -295,12 +295,12 @@ public static partial class ReportCompiler
         html.Append("</tr>");
     }
 
-    private static bool IsShown(Block block, JsonElement data)
+    private static bool IsShown(Block block, ReportDefinition definition, JsonElement data, CompileOptions options)
     {
         if (block.When is null || string.IsNullOrWhiteSpace(block.When.Path))
             return true;
 
-        var found = DataValues.TryResolve(data, block.When.Path, out var value);
+        var found = TryResolveValue(block.When.Path, definition, data, options, out var value);
         var empty = !found || IsEmpty(value);
         return block.When.Kind switch
         {
@@ -359,7 +359,7 @@ public static partial class ReportCompiler
         return DataValues.Format(JsonSerializer.SerializeToElement(result), aggregate.Format, culture);
     }
 
-    private static string Expand(string? text, JsonElement data, CultureInfo culture)
+    private static string Expand(string? text, ReportDefinition definition, JsonElement data, CompileOptions options)
     {
         if (string.IsNullOrEmpty(text))
             return "";
@@ -371,10 +371,7 @@ public static partial class ReportCompiler
             html.Append(Encode(text[index..match.Index]));
             var path = match.Groups[1].Value;
             var format = match.Groups[2].Success ? match.Groups[2].Value : null;
-            var rendered = DataValues.TryResolve(data, path, out var value)
-                ? DataValues.Format(value, format, culture)
-                : "";
-            html.Append(Encode(rendered));
+            html.Append(Encode(ResolveText(path, format, definition, data, options)));
             index = match.Index + match.Length;
         }
 
@@ -382,7 +379,58 @@ public static partial class ReportCompiler
         return html.ToString();
     }
 
-    private static string SheetCss(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers) =>
+    private static string ResolveText(string path, string? format, ReportDefinition definition, JsonElement data, CompileOptions options)
+    {
+        if (path == PrintPaths.ReportName)
+            return definition.Name;
+        if (path is PrintPaths.Date or PrintPaths.Time)
+            return FormatClock(options, format, path == PrintPaths.Date);
+        if (!TryResolveValue(path, definition, data, options, out var value))
+            return "";
+        return DataValues.Format(value, format, options.Culture);
+    }
+
+    private static bool TryResolveValue(string path, ReportDefinition definition, JsonElement data, CompileOptions options, out JsonElement value)
+    {
+        if (PrintPaths.IsPrintField(path))
+        {
+            value = PrintElement(path, definition, options);
+            return true;
+        }
+
+        if (PrintPaths.TryParameterName(path, out var name))
+            return ParameterValues.TryGet(definition, options.Parameters, name, out value);
+
+        return DataValues.TryResolve(data, path, out value);
+    }
+
+    private static JsonElement PrintElement(string path, ReportDefinition definition, CompileOptions options)
+    {
+        var moment = (options.Clock ?? DateTimeOffset.Now).DateTime;
+        var text = path switch
+        {
+            PrintPaths.Date => moment.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            PrintPaths.Time => moment.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
+            _ => definition.Name
+        };
+        return JsonSerializer.SerializeToElement(text);
+    }
+
+    private static string FormatClock(CompileOptions options, string? format, bool date)
+    {
+        var moment = (options.Clock ?? DateTimeOffset.Now).DateTime;
+        var pattern = string.IsNullOrWhiteSpace(format) ? date ? "d" : "t" : format;
+        try
+        {
+            return moment.ToString(pattern, options.Culture);
+        }
+        catch (FormatException)
+        {
+            return moment.ToString(date ? "d" : "t", options.Culture);
+        }
+    }
+
+    private static string SheetCss(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber) =>
         $$"""
         html, body { margin: 0; padding: 0; }
         body {
@@ -423,7 +471,7 @@ public static partial class ReportCompiler
         .rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
         body.design .block { cursor: pointer; outline: 1px solid #d1d5db; }
         body.design .block.rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
-        {{PageRule(size, margin, headerMm, footerMm, numberMm, numbers)}}
+        {{PageRule(size, margin, headerMm, footerMm, numberMm, numbers, omitFirstPageNumber)}}
         @media print {
           body { background: #fff; }
           .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
@@ -432,7 +480,7 @@ public static partial class ReportCompiler
         }
         """;
 
-    private static string PageRule(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers)
+    private static string PageRule(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber)
     {
         var top = margin.Top + headerMm;
         var bottom = margin.Bottom + footerMm + numberMm;
@@ -440,14 +488,15 @@ public static partial class ReportCompiler
         rule.Append("@page { size: ").Append(Num(size.WidthMm)).Append("mm ").Append(Num(size.HeightMm))
             .Append("mm; margin: ").Append(Num(top)).Append("mm ").Append(Num(margin.Right))
             .Append("mm ").Append(Num(bottom)).Append("mm ").Append(Num(margin.Left)).Append("mm;");
-        if (numbers != PageNumberPlacement.None)
+        var slot = numbers switch
         {
-            var slot = numbers switch
-            {
-                PageNumberPlacement.BottomLeft => "bottom-left",
-                PageNumberPlacement.BottomRight => "bottom-right",
-                _ => "bottom-center"
-            };
+            PageNumberPlacement.BottomLeft => "bottom-left",
+            PageNumberPlacement.BottomRight => "bottom-right",
+            PageNumberPlacement.None => null,
+            _ => "bottom-center"
+        };
+        if (slot is not null)
+        {
             rule.Append(" @").Append(slot)
                 .Append(" { content: \"Page \" counter(page) \" of \" counter(pages); font-family: \"Source Sans 3\", sans-serif; font-size: 9pt; color: #6b7280;");
             if (footerMm > 0)
@@ -456,6 +505,8 @@ public static partial class ReportCompiler
         }
 
         rule.Append(" }");
+        if (slot is not null && omitFirstPageNumber)
+            rule.Append(" @page :first { @").Append(slot).Append(" { content: none; } }");
         return rule.ToString();
     }
 

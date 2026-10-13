@@ -240,6 +240,138 @@ public class ReportTests
         Assert.Contains("counter(page)", html, StringComparison.Ordinal);
         Assert.Contains("counter(pages)", html, StringComparison.Ordinal);
         Assert.Contains("margin: 24mm 12mm 28mm 12mm;", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("@page :first", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parameters_FormatInTheCultureAndFillFromTheDefault()
+    {
+        var definition = new ReportDefinition
+        {
+            Name = "A&B",
+            Parameters =
+            [
+                new ReportParameter { Name = "amount", Kind = ParameterKind.Number, Default = "1.5" },
+                new ReportParameter { Name = "title", Kind = ParameterKind.String, Default = "Estimate" },
+                new ReportParameter { Name = "when", Kind = ParameterKind.Date, Default = "2026-03-14" },
+                new ReportParameter { Name = "note", Kind = ParameterKind.String }
+            ],
+            Body =
+            {
+                Blocks =
+                [
+                    new TextBlock
+                    {
+                        Id = "body",
+                        Text = "{param.amount:C}\n{param.title}\n{param.when:MMMM d, yyyy}\n{param.note}\n{report.name}"
+                    }
+                ]
+            }
+        };
+
+        var defaults = ReportCompiler.Compile(definition, default, new CompileOptions { Culture = Us });
+        Assert.Contains("$1.50", defaults, StringComparison.Ordinal);
+        Assert.Contains("Estimate", defaults, StringComparison.Ordinal);
+        Assert.Contains("March 14, 2026", defaults, StringComparison.Ordinal);
+        Assert.Contains("A&amp;B", defaults, StringComparison.Ordinal);
+        Assert.DoesNotContain("parameters", ReportJson.Write(new ReportDefinition { Name = "Plain" }), StringComparison.Ordinal);
+
+        var supplied = ReportCompiler.Compile(definition, default, new CompileOptions
+        {
+            Culture = Us,
+            Parameters = JsonSerializer.SerializeToElement(new { amount = 2.25m, title = "", note = "<b>" })
+        });
+        Assert.Contains("$2.25", supplied, StringComparison.Ordinal);
+        Assert.Contains("&lt;b&gt;", supplied, StringComparison.Ordinal);
+        Assert.DoesNotContain("Estimate", supplied, StringComparison.Ordinal);
+        Assert.Contains("March 14, 2026", supplied, StringComparison.Ordinal);
+
+        var sample = ReportBindings.Sample(definition);
+        Assert.False(sample.TryGetProperty("param", out _));
+        Assert.False(sample.TryGetProperty("report", out _));
+        Assert.False(sample.TryGetProperty("print", out _));
+        Assert.Contains("\"kind\": \"number\"", ReportJson.Write(definition), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PrintDate_UsesTheClockPassedToCompile()
+    {
+        var definition = new ReportDefinition
+        {
+            Name = "Statement",
+            Body =
+            {
+                Blocks =
+                [
+                    new TextBlock { Id = "clock", Text = "{print.time:HH:mm}" },
+                    new FieldBlock { Id = "day", Path = "print.date", Format = "yyyy-MM-dd" }
+                ]
+            }
+        };
+
+        var html = ReportCompiler.Compile(definition, default, new CompileOptions
+        {
+            Culture = CultureInfo.InvariantCulture,
+            Clock = new DateTimeOffset(2026, 3, 14, 15, 4, 0, TimeSpan.Zero)
+        });
+
+        Assert.Contains("15:04", html, StringComparison.Ordinal);
+        Assert.Contains("2026-03-14", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParameterToken_DoesNotStealALongerDataPath()
+    {
+        var definition = new ReportDefinition
+        {
+            Parameters = [new ReportParameter { Name = "customer", Kind = ParameterKind.String, Default = "Defaulted" }],
+            Body = { Blocks = [new TextBlock { Id = "t", Text = "{param.customer} {param.customer.name}" }] }
+        };
+        var data = JsonSerializer.SerializeToElement(new { param = new { customer = new { name = "Kept" } } });
+
+        var html = ReportCompiler.Compile(definition, data);
+
+        Assert.Contains("Defaulted", html, StringComparison.Ordinal);
+        Assert.Contains("Kept", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageNumbers_CanStayOffTheFirstPage()
+    {
+        var definition = new ReportDefinition
+        {
+            Page = new PageSetup
+            {
+                PageNumbers = PageNumberPlacement.BottomCenter,
+                PageHeaderMm = 12,
+                OmitPageNumberOnFirstPage = true
+            },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "Acme" }] },
+            Body = { Blocks = [new TextBlock { Id = "body", Text = "Body" }] }
+        };
+
+        var html = ReportCompiler.Compile(definition, default);
+
+        Assert.Contains("@page :first { @bottom-center { content: none; } }", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"page-chrome page-header\"", html, StringComparison.Ordinal);
+        Assert.Contains(">Acme<", html, StringComparison.Ordinal);
+        Assert.Contains("counter(page)", html, StringComparison.Ordinal);
+        Assert.True(ReportJson.Read(ReportJson.Write(definition)).Page.OmitPageNumberOnFirstPage);
+    }
+
+    [Fact]
+    public void Validator_RejectsAParameterThatDoesNotMatch()
+    {
+        var report = new ReportDefinition
+        {
+            Parameters = [new ReportParameter { Name = "copies", Kind = ParameterKind.Number, Default = "tomorrow" }],
+            Body = { Blocks = [new TextBlock { Id = "t", Text = "{param.missing}" }] }
+        };
+
+        var errors = ReportValidator.Validate(report);
+
+        Assert.Contains(errors, error => error.Contains("copies", StringComparison.Ordinal) && error.Contains("number", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("not declared", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -47,7 +47,7 @@ dotnet run --project src/ReportCreator.Builder
 The window has the block list on the left, the PDF preview in the middle, and the property panel on the right. The preview is the same PDF export the File menu writes. It refreshes about half a second after you change the report or the data. Choosing another block does not reprint.
 
 1. Choose **File → New**, or **File → New invoice sample** to open the invoice with its sample data.
-2. Choose **Page setup** and set the paper, orientation, and margins. Lengths are millimetres. Page header and page footer heights are millimetres too. `0` means 14 mm when that band has blocks, and the number strip is 6 mm when page numbers are on. Page numbers are none, bottom left, bottom center, or bottom right, and they print as `Page 1 of 2`.
+2. Choose **Page setup** and set the paper, orientation, and margins. Lengths are millimetres. Page header and page footer heights are millimetres too. `0` means 14 mm when that band has blocks, and the number strip is 6 mm when page numbers are on. Page numbers are none, bottom left, bottom center, or bottom right, and they print as `Page 1 of 2`. Uncheck **Number the first page** to leave that number off page 1. The page header still prints there.
 3. In the block list, pick Header, Body, Footer, Page header, or Page footer, pick a block kind, and click **Add**.
 4. Select the block and edit it in the property panel.
 5. Use **Up**, **Down**, and **Delete** to reorder the list.
@@ -56,6 +56,35 @@ The window has the block list on the left, the PDF preview in the middle, and th
 8. Choose **File → Export HTML** or **File → Export PDF**.
 
 Header, body, and footer each print once. Page header and page footer repeat on every page. Put the letterhead in the page header and a one-time title in the report header.
+
+## Parameters and print fields
+
+A parameter is a value the caller passes next to the data. Declare it on the report. `kind` is `string`, `number`, `date`, or `bool`. `default` is optional. A missing parameter uses that default. A blank value does not.
+
+```json
+"parameters": [
+  { "name": "copies", "kind": "number", "default": "1" }
+]
+```
+
+In text, write `{param.copies}` or `{param.copies:0}`. A field path can be `param.copies`. `{param.customer.name}` is still a data path, because a parameter name has no dot.
+
+Three print fields are not data, and they are not stored on the sample JSON: `{report.name}`, `{print.date}`, and `{print.time}`. A format uses the same .NET date patterns as a field, for example `{print.date:MMMM d, yyyy}`. Pass `CompileOptions.Clock` when the printed time must stay fixed. Page numbers are not tokens. They stay in the page margin.
+
+```csharp
+using System.Globalization;
+using System.Text.Json;
+using ReportCreator.Compile;
+
+var html = ReportCompiler.Compile(definition, data, new CompileOptions
+{
+    Culture = CultureInfo.GetCultureInfo("en-US"),
+    Clock = new DateTimeOffset(2026, 3, 14, 15, 4, 0, TimeSpan.Zero),
+    Parameters = JsonSerializer.SerializeToElement(new { copies = 2 })
+});
+```
+
+`PdfExportOptions` takes the same `Parameters` object and `Clock` when you export PDF. There is no prompt form. The caller asks the user.
 
 ## See the invoice
 

@@ -536,6 +536,7 @@ public partial class MainWindow : Window
     {
         definition.Page ??= new PageSetup();
         definition.Page.Margin ??= new Margin();
+        definition.Parameters ??= [];
         definition.Header ??= new Band();
         definition.Body ??= new Band();
         definition.Footer ??= new Band();

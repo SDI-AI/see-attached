@@ -36,6 +36,12 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 
 Not in this version: charts, barcodes, rich text, expressions, right-to-left layout, and a free canvas.
 
+## What 1.1 adds
+
+- Parameters are string, number, date, or bool, each with an optional default. Pass a JSON object of values beside the data. A token `{param.name}` uses the same format rules as a field. A missing parameter uses its default. A blank value stays blank.
+- Print fields `{report.name}`, `{print.date}`, and `{print.time}` are not data paths. Page numbers stay in the page margin. They are not tokens in flowing text.
+- Page setup can leave the page number off the first page. The repeating page header still prints on that page.
+
 ## Projects
 
 | Project | Role |
@@ -94,7 +100,7 @@ npm run dev
 
 `npm install` and `npm run dev` must run inside `samples/viewer-next`. Do not add a `package.json` at the repository root. Next.js 16 added `@types/node` 26.6.5 as a sample dev dependency the first time `next build` saw TypeScript. It is not used by the .NET libraries.
 
-The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, and page numbers. Select a block in the list and edit it in the property panel. The Data expander edits the sample JSON and can insert fields the report binds but the JSON does not have yet. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
+The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, page numbers, and whether page 1 is numbered. Select a block in the list and edit it in the property panel. The Data expander edits the sample JSON and can insert fields the report binds but the JSON does not have yet. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
 
 ## PDF on Azure
 

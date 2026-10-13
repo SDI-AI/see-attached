@@ -56,7 +56,9 @@ public sealed class ReportPdfExporter : IAsyncDisposable
         {
             var html = ReportCompiler.Compile(definition, data, new CompileOptions
             {
-                Culture = _options.Culture ?? CultureInfo.CurrentCulture
+                Culture = _options.Culture ?? CultureInfo.CurrentCulture,
+                Parameters = _options.Parameters,
+                Clock = _options.Clock
             });
             var page = await _browser.NewPageAsync();
             try

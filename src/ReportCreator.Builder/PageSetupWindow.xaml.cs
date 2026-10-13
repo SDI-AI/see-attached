@@ -27,6 +27,7 @@ public partial class PageSetupWindow : Window
         FooterBox.Text = _page.PageFooterMm.ToString(CultureInfo.CurrentCulture);
         NumberBox.ItemsSource = Enum.GetValues<PageNumberPlacement>();
         NumberBox.SelectedItem = _page.PageNumbers;
+        FirstNumberBox.IsChecked = !_page.OmitPageNumberOnFirstPage;
         UpdateCustom();
     }
 
@@ -82,6 +83,7 @@ public partial class PageSetupWindow : Window
         _page.PageHeaderMm = header;
         _page.PageFooterMm = footer;
         _page.PageNumbers = numbers;
+        _page.OmitPageNumberOnFirstPage = FirstNumberBox.IsChecked != true;
 
         var errors = ReportValidator.Validate(new ReportDefinition { Name = "Page", Page = _page });
         if (errors.Count > 0)
@@ -112,6 +114,7 @@ public partial class PageSetupWindow : Window
         },
         PageHeaderMm = page.PageHeaderMm,
         PageFooterMm = page.PageFooterMm,
-        PageNumbers = page.PageNumbers
+        PageNumbers = page.PageNumbers,
+        OmitPageNumberOnFirstPage = page.OmitPageNumberOnFirstPage
     };
 }

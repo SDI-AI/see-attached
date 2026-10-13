@@ -110,6 +110,54 @@ public class PdfExportTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Export_OmitsThePageNumberOnTheFirstPageOnly()
+    {
+        var rows = new List<object>();
+        for (var index = 1; index <= 48; index++)
+            rows.Add(new { description = "Line " + index.ToString(CultureInfo.InvariantCulture), amount = index });
+
+        var definition = new ReportDefinition
+        {
+            Name = "Statement",
+            Page = new PageSetup
+            {
+                PageNumbers = PageNumberPlacement.BottomRight,
+                PageHeaderMm = 12,
+                OmitPageNumberOnFirstPage = true
+            },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "Acme Statement" }] },
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        Columns =
+                        [
+                            new TableColumn { Header = "Description", Path = "description" },
+                            new TableColumn { Header = "Amount", Path = "amount", Align = TextAlign.Right }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { lines = rows });
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.GetCultureInfo("en-US")
+        });
+
+        var pages = ExtractPages(await exporter.ExportAsync(definition, data, TestContext.Current.CancellationToken));
+
+        Assert.True(pages.Count >= 2, "Expected the statement to fill at least two pages, got " + pages.Count + ".");
+        Assert.DoesNotContain("Page 1 of", pages[0], StringComparison.Ordinal);
+        Assert.Contains("Page 2 of", pages[1], StringComparison.Ordinal);
+        Assert.Contains("Acme Statement", pages[0], StringComparison.Ordinal);
+    }
+
     private static string Fixture(string name) =>
         Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice", name);
 

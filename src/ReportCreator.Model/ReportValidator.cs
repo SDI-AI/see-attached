@@ -1,8 +1,9 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace ReportCreator.Model;
 
-public static class ReportValidator
+public static partial class ReportValidator
 {
     public static IReadOnlyList<string> Validate(ReportDefinition definition)
     {
@@ -20,6 +21,7 @@ public static class ReportValidator
         else
             ValidatePage(definition.Page, errors);
 
+        definition.Parameters ??= [];
         definition.Header ??= new Band();
         definition.Body ??= new Band();
         definition.Footer ??= new Band();
@@ -31,12 +33,13 @@ public static class ReportValidator
         definition.PageHeader.Blocks ??= [];
         definition.PageFooter.Blocks ??= [];
 
+        var parameters = ValidateParameters(definition, errors);
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        ValidateBand(definition.Header, "Header", errors, ids, insideColumns: false);
-        ValidateBand(definition.Body, "Body", errors, ids, insideColumns: false);
-        ValidateBand(definition.Footer, "Footer", errors, ids, insideColumns: false);
-        ValidateBand(definition.PageHeader, "Page header", errors, ids, insideColumns: false);
-        ValidateBand(definition.PageFooter, "Page footer", errors, ids, insideColumns: false);
+        ValidateBand(definition.Header, "Header", errors, ids, parameters, insideColumns: false);
+        ValidateBand(definition.Body, "Body", errors, ids, parameters, insideColumns: false);
+        ValidateBand(definition.Footer, "Footer", errors, ids, parameters, insideColumns: false);
+        ValidateBand(definition.PageHeader, "Page header", errors, ids, parameters, insideColumns: false);
+        ValidateBand(definition.PageFooter, "Page footer", errors, ids, parameters, insideColumns: false);
         if (definition.Page is not null && definition.Page.Margin is not null && errors.All(error => !error.Contains("no room for content", StringComparison.Ordinal)))
             ValidateChromeRoom(definition, errors);
         return errors;
@@ -89,13 +92,36 @@ public static class ReportValidator
             errors.Add("The page header, page footer, page numbers, and margins leave no room for content.");
     }
 
-    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, bool insideColumns)
+    private static HashSet<string> ValidateParameters(ReportDefinition definition, List<string> errors)
     {
-        foreach (var block in band.Blocks)
-            ValidateBlock(block, scope, errors, ids, insideColumns);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        if (definition.Parameters.Count > 32)
+            errors.Add("A report can declare at most 32 parameters.");
+
+        foreach (var parameter in definition.Parameters)
+        {
+            var label = string.IsNullOrWhiteSpace(parameter.Name) ? "(unnamed)" : parameter.Name.Trim();
+            if (!ParameterRules.IsName(parameter.Name))
+                errors.Add($"Parameter '{label}' needs a name made of letters, digits, and underscores.");
+            else if (!names.Add(parameter.Name))
+                errors.Add($"Parameter '{parameter.Name}' is declared more than once.");
+
+            if (!Enum.IsDefined(parameter.Kind))
+                errors.Add($"Parameter '{label}' must be a string, number, date, or bool.");
+            else if (!ParameterRules.DefaultMatches(parameter, out var problem))
+                errors.Add($"Parameter '{label}' default {problem}.");
+        }
+
+        return names;
     }
 
-    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, bool insideColumns)
+    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, bool insideColumns)
+    {
+        foreach (var block in band.Blocks)
+            ValidateBlock(block, scope, errors, ids, parameters, insideColumns);
+    }
+
+    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, bool insideColumns)
     {
         if (string.IsNullOrWhiteSpace(block.Id) || block.Id.Length > 64 || block.Id.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
             errors.Add($"{scope} has a block whose id is missing or not a short letter, digit, '_' or '-' id.");
@@ -107,6 +133,7 @@ public static class ReportValidator
         {
             if (!StyleRules.IsBindingPath(when.Path))
                 errors.Add($"{where} show-when needs a binding path such as customer.name.");
+            CheckParameter(when.Path, where, parameters, errors);
             if (!Enum.IsDefined(when.Kind))
                 errors.Add($"{where} show-when comparison is not recognized.");
             if (when.Kind is ShowWhenKind.Equals or ShowWhenKind.NotEquals or ShowWhenKind.GreaterThan or ShowWhenKind.LessThan
@@ -119,11 +146,14 @@ public static class ReportValidator
             case TextBlock text:
                 if (text.Text.Length > 20_000)
                     errors.Add($"{where} has too much text.");
+                foreach (Match match in Token().Matches(text.Text))
+                    CheckParameter(match.Groups[1].Value, where, parameters, errors);
                 ValidateStyle(where, text.FontSizePt, text.Color, errors);
                 break;
             case FieldBlock field:
                 if (!StyleRules.IsBindingPath(field.Path))
                     errors.Add($"{where} needs a binding path such as customer.name.");
+                CheckParameter(field.Path, where, parameters, errors);
                 ValidateStyle(where, field.FontSizePt, field.Color, errors);
                 ValidateFormat(where, field.Format, errors);
                 break;
@@ -146,7 +176,7 @@ public static class ReportValidator
                 foreach (var column in columns.Columns)
                 {
                     foreach (var child in column.Blocks)
-                        ValidateBlock(child, scope, errors, ids, insideColumns: true);
+                        ValidateBlock(child, scope, errors, ids, parameters, insideColumns: true);
                 }
                 break;
             case TableBlock table:
@@ -154,6 +184,7 @@ public static class ReportValidator
                     errors.Add($"{where} needs a data path for its rows.");
                 if (!string.IsNullOrWhiteSpace(table.GroupBy) && !StyleRules.IsBindingPath(table.GroupBy))
                     errors.Add($"{where} group path must look like customer.name.");
+                CheckParameter(table.GroupBy, where, parameters, errors);
                 if (table.Columns.Count == 0)
                     errors.Add($"{where} needs at least one column.");
                 table.GroupAggregates ??= [];
@@ -163,6 +194,7 @@ public static class ReportValidator
                         errors.Add($"{where} has a column without a header.");
                     if (!StyleRules.IsBindingPath(column.Path))
                         errors.Add($"{where} has a column without a binding path.");
+                    CheckParameter(column.Path, where, parameters, errors);
                     ValidateFormat(where, column.Format, errors);
                     RequireMm(column.WidthMm, $"{where} column width", errors, positive: true, allowNull: true);
                 }
@@ -177,6 +209,12 @@ public static class ReportValidator
                 }
                 break;
         }
+    }
+
+    private static void CheckParameter(string? path, string where, HashSet<string> parameters, List<string> errors)
+    {
+        if (PrintPaths.TryParameterName(path, out var name) && !parameters.Contains(name))
+            errors.Add($"{where} refers to parameter '{name}', which is not declared.");
     }
 
     private static void ValidateStyle(string where, decimal fontSizePt, string? color, List<string> errors)
@@ -231,4 +269,7 @@ public static class ReportValidator
         else if (value > 2000 || !StyleRules.HasAtMostTwoDecimalPlaces(value.Value))
             errors.Add($"{label} must be in millimetres with at most two decimal places.");
     }
+
+    [GeneratedRegex("\\{([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)(?::([^{}]+))?\\}")]
+    private static partial Regex Token();
 }

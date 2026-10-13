@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ReportCreator.Model;
 
 public sealed class ReportDefinition
@@ -9,6 +11,8 @@ public sealed class ReportDefinition
     public string Name { get; set; } = "Report";
 
     public PageSetup Page { get; set; } = new();
+
+    public List<ReportParameter> Parameters { get; set; } = [];
 
     public Band Header { get; set; } = new();
 
@@ -38,6 +42,10 @@ public sealed class PageSetup
     public decimal PageFooterMm { get; set; }
 
     public PageNumberPlacement PageNumbers { get; set; } = PageNumberPlacement.None;
+
+    // Leaves the page-number margin box off page 1. The repeating page header still prints there.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool OmitPageNumberOnFirstPage { get; set; }
 }
 
 public sealed class Margin

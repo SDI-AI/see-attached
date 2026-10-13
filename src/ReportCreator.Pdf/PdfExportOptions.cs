@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace ReportCreator.Pdf;
 
@@ -12,4 +13,10 @@ public sealed class PdfExportOptions
     public bool Container { get; init; }
 
     public CultureInfo? Culture { get; init; }
+
+    // JSON object keyed by parameter name. A missing key uses the parameter default.
+    public JsonElement Parameters { get; init; }
+
+    // Wall-clock time for print date and print time. Null uses the local time of the export.
+    public DateTimeOffset? Clock { get; init; }
 }
