@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/render-fixture/render-fixture.csproj" />
+    <Project Path="samples/viewer-blazor/viewer-blazor.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/ReportCreator.Blazor/ReportCreator.Blazor.csproj" />
+    <Project Path="src/ReportCreator.Builder/ReportCreator.Builder.csproj" />
+    <Project Path="src/ReportCreator.Compile/ReportCreator.Compile.csproj" />
+    <Project Path="src/ReportCreator.Model/ReportCreator.Model.csproj" />
+    <Project Path="src/ReportCreator.Pdf/ReportCreator.Pdf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ReportCreator.Compile.Tests/ReportCreator.Compile.Tests.csproj" />
+    <Project Path="tests/ReportCreator.Pdf.Tests/ReportCreator.Pdf.Tests.csproj" />
+  </Folder>
+</Solution>

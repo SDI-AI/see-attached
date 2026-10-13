@@ -1,0 +1,34 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  color: #111827;
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.viewer header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.viewer header button {
+  font: inherit;
+  padding: 4px 10px;
+}
+
+.viewer iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #e5e7eb;
+  zoom: var(--zoom);
+}

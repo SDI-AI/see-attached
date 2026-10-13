@@ -1,0 +1,21 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    color: #111827;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 16px;
+    background: #fef3c7;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    margin-left: 12px;
+}

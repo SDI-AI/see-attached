@@ -1,0 +1,5 @@
+Source Sans 3, Latin subset, regular and bold.
+Copyright 2010-2024 Adobe. Reserved Font Name: Source.
+Licensed under the SIL Open Font License 1.1. See OFL.txt in this folder.
+The woff2 files are the unmodified Latin subsets published by Fontsource.
+Reports embed these files so a screen preview and a Linux PDF host use the same glyphs.

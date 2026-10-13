@@ -1,0 +1,75 @@
+@page "/"
+@rendermode InteractiveServer
+@using System.Globalization
+@using System.Text.Json
+@using ReportCreator.Blazor
+@using ReportCreator.Compile
+@using ReportCreator.Model
+@using ReportCreator.Pdf
+
+<PageTitle>Invoice</PageTitle>
+
+<div class="host">
+    <div class="actions">
+        <button type="button" @onclick="MakePdfAsync" disabled="@_busy">@_pdfLabel</button>
+        @if (_error is not null)
+        {
+            <span class="error">@_error</span>
+        }
+    </div>
+    <ReportViewer Html="@_html" Pdf="@_pdf" PdfFileName="invoice.pdf" />
+</div>
+
+@code {
+    private string _html = "";
+    private byte[]? _pdf;
+    private string? _error;
+    private bool _busy;
+    private string _pdfLabel = "Make PDF";
+
+    protected override void OnInitialized()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice");
+        var definition = ReportJson.Read(File.ReadAllText(Path.Combine(root, "definition.json")));
+        var data = ReportJson.ReadData(File.ReadAllText(Path.Combine(root, "data.json")));
+        _html = ReportCompiler.Compile(definition, data, new CompileOptions
+        {
+            Culture = CultureInfo.GetCultureInfo("en-US")
+        });
+        _definition = definition;
+        _data = data;
+    }
+
+    private ReportDefinition _definition = new();
+    private JsonElement _data;
+
+    private async Task MakePdfAsync()
+    {
+        _busy = true;
+        _error = null;
+        _pdfLabel = "Making PDF…";
+        try
+        {
+            var container = string.Equals(
+                Environment.GetEnvironmentVariable("REPORTCREATOR_CONTAINER"),
+                "1",
+                StringComparison.Ordinal);
+            await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+            {
+                Container = container,
+                Culture = CultureInfo.GetCultureInfo("en-US")
+            });
+            _pdf = await exporter.ExportAsync(_definition, _data);
+            _pdfLabel = "PDF ready";
+        }
+        catch (Exception exception)
+        {
+            _error = exception.InnerException?.Message ?? exception.Message;
+            _pdfLabel = "Make PDF";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

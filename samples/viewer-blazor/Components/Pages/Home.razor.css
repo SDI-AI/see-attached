@@ -1,0 +1,29 @@
+.host {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.host ::deep .rc-viewer {
+    flex: 1;
+    min-height: 0;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.actions button {
+    font: inherit;
+    padding: 4px 10px;
+}
+
+.error {
+    color: #991b1b;
+}

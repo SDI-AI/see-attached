@@ -1,0 +1,76 @@
+@namespace ReportCreator.Blazor
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="rc-viewer">
+    <div class="rc-toolbar">
+        <button type="button" @onclick="ZoomOut" disabled="@(_zoom <= 50)">Smaller</button>
+        <span>@_zoom%</span>
+        <button type="button" @onclick="ZoomIn" disabled="@(_zoom >= 200)">Larger</button>
+        <button type="button" @onclick="PrintAsync">Print</button>
+        @if (Pdf is { Length: > 0 })
+        {
+            <button type="button" @onclick="DownloadAsync">Download PDF</button>
+        }
+    </div>
+    <div class="rc-stage">
+        @if (string.IsNullOrEmpty(Html))
+        {
+            <p class="rc-empty">No report to show.</p>
+        }
+        else
+        {
+            <iframe id="@_frameId"
+                    title="Report"
+                    sandbox="allow-same-origin allow-modals"
+                    srcdoc="@Html"
+                    style="@FrameStyle"></iframe>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly string _frameId = "rc-frame-" + Guid.NewGuid().ToString("N");
+    private IJSObjectReference? _module;
+    private int _zoom = 100;
+
+    [Parameter]
+    public string Html { get; set; } = "";
+
+    [Parameter]
+    public byte[]? Pdf { get; set; }
+
+    [Parameter]
+    public string PdfFileName { get; set; } = "report.pdf";
+
+    private string FrameStyle => $"zoom: {(_zoom / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ReportCreator.Blazor/reportViewer.js");
+    }
+
+    private void ZoomOut() => _zoom = Math.Max(50, _zoom - 10);
+
+    private void ZoomIn() => _zoom = Math.Min(200, _zoom + 10);
+
+    private async Task PrintAsync()
+    {
+        if (_module is not null)
+            await _module.InvokeVoidAsync("printFrame", _frameId);
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (_module is null || Pdf is not { Length: > 0 })
+            return;
+        await _module.InvokeVoidAsync("downloadPdf", Convert.ToBase64String(Pdf), PdfFileName);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+            await _module.DisposeAsync();
+    }
+}

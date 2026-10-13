@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>viewer_blazor</RootNamespace>
+    <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ReportCreator.Blazor\ReportCreator.Blazor.csproj" />
+    <ProjectReference Include="..\..\src\ReportCreator.Compile\ReportCreator.Compile.csproj" />
+    <ProjectReference Include="..\..\src\ReportCreator.Pdf\ReportCreator.Pdf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\fixtures\invoice\*.json" Link="fixtures\invoice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

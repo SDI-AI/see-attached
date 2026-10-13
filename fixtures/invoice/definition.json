@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "name": "Invoice",
+  "page": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 }
+  },
+  "header": {
+    "blocks": [
+      {
+        "type": "columns",
+        "id": "hdr-cols",
+        "keepTogether": true,
+        "columns": [
+          {
+            "blocks": [
+              { "type": "text", "id": "title", "text": "Invoice", "bold": true, "fontSizePt": 28 }
+            ]
+          },
+          {
+            "blocks": [
+              {
+                "type": "text",
+                "id": "meta",
+                "align": "right",
+                "text": "No. {invoice.number}\n{invoice.date:MMMM d, yyyy}"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "body": {
+    "blocks": [
+      { "type": "spacer", "id": "sp1", "heightMm": 8 },
+      {
+        "type": "columns",
+        "id": "addr",
+        "keepTogether": true,
+        "columns": [
+          {
+            "blocks": [
+              { "type": "text", "id": "bill-label", "text": "Bill to", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              { "type": "text", "id": "bill", "text": "{invoice.billTo.name}\n{invoice.billTo.city}" }
+            ]
+          },
+          {
+            "blocks": [
+              { "type": "text", "id": "from-label", "text": "From", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              { "type": "text", "id": "from", "text": "{invoice.from.name}\n{invoice.from.city}" }
+            ]
+          }
+        ]
+      },
+      { "type": "spacer", "id": "sp2", "heightMm": 8 },
+      {
+        "type": "table",
+        "id": "lines",
+        "dataPath": "lines",
+        "columns": [
+          { "header": "Description", "path": "description" },
+          { "header": "Qty", "path": "qty", "format": "0.##", "align": "right", "widthMm": 20 },
+          { "header": "Price", "path": "price", "format": "C", "align": "right", "widthMm": 30 },
+          { "header": "Amount", "path": "amount", "format": "C", "align": "right", "widthMm": 30 }
+        ],
+        "aggregates": [
+          { "label": "Total", "columnPath": "amount", "kind": "sum", "format": "C" }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "blocks": [
+      { "type": "spacer", "id": "sp3", "heightMm": 6 },
+      { "type": "text", "id": "thanks", "text": "Thank you.", "fontSizePt": 10, "color": "#6b7280" }
+    ]
+  }
+}

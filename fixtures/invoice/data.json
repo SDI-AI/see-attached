@@ -1,0 +1,12 @@
+{
+  "invoice": {
+    "number": "INV-1001",
+    "date": "2026-03-14",
+    "billTo": { "name": "Northwind Traders", "city": "Seattle" },
+    "from": { "name": "Contoso Press", "city": "Redmond" }
+  },
+  "lines": [
+    { "description": "Widget", "qty": 2, "price": 12.5, "amount": 25 },
+    { "description": "Gadget", "qty": 1, "price": 40, "amount": 40 }
+  ]
+}
