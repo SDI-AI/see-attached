@@ -1,5 +1,7 @@
 # See Attached
 
+https://seeattachedreports.com
+
 Reports are the attachment. The app gets the attention, and the invoice, the statement, and the list wait until someone asks for the PDF. See Attached is an open-source builder for those documents. A report is a header, a body that flows, and a footer. Tables split by row. It is not a free canvas and not a pixel-perfect form.
 
 The file you save is JSON. HTML is only the render artifact. .NET binds the data and compiles one self-contained HTML file. A browser shows that file. Playwright prints the same HTML to PDF.
