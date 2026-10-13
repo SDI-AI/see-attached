@@ -70,7 +70,7 @@ public partial class MainWindow : Window
         _definition = ReportJson.Read(ReadEmbedded("invoice.definition.json"));
         _data = ReportJson.ReadData(ReadEmbedded("invoice.data.json"));
         Normalize(_definition);
-        Title = "Report Creator — Invoice";
+        Title = "See Attached — Invoice";
         RefreshList(_definition.Body.Blocks.FirstOrDefault()?.Id);
         Status.Text = "Invoice sample. Data is loaded for preview only.";
     }
@@ -88,7 +88,7 @@ public partial class MainWindow : Window
                 : ReportJson.Read(File.ReadAllText(dialog.FileName));
             Normalize(_definition);
             _path = dialog.FileName;
-            Title = "Report Creator — " + _definition.Name;
+            Title = "See Attached — " + _definition.Name;
             RefreshList(null);
             Status.Text = "Opened " + dialog.FileName;
         }
@@ -226,7 +226,7 @@ public partial class MainWindow : Window
         _data = JsonSerializer.SerializeToElement(new { });
         _definition = new ReportDefinition();
         _definition.Header.Blocks.Add(new ModelText { Id = NewId(), Text = "Report", Bold = true, FontSizePt = 22 });
-        Title = "Report Creator";
+        Title = "See Attached";
         RefreshList(_definition.Header.Blocks[0].Id);
         Status.Text = "New report.";
     }
@@ -326,7 +326,7 @@ public partial class MainWindow : Window
         }
 
         _path = path;
-        Title = "Report Creator — " + _definition.Name;
+        Title = "See Attached — " + _definition.Name;
         Status.Text = "Saved " + path;
     }
 
