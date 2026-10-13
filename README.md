@@ -42,6 +42,12 @@ Not in this version: charts, barcodes, rich text, expressions, right-to-left lay
 - Print fields `{report.name}`, `{print.date}`, and `{print.time}` are not data paths. Page numbers stay in the page margin. They are not tokens in flowing text.
 - Page setup can leave the page number off the first page. The repeating page header still prints on that page.
 
+## What 1.2 adds
+
+- A block can break the page before itself or after itself.
+- A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
+- A later group can start on a new page. A group stays on one page when it fits.
+
 ## Projects
 
 | Project | Role |

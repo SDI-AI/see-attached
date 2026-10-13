@@ -186,7 +186,9 @@ Two aggregates on the same column show only the first one. The aggregate label p
 { "type": "text", "id": "paid", "text": "Paid", "when": { "path": "invoice.balance", "kind": "equals", "value": "0" } }
 ```
 
-A grouped table prints a heading for each distinct value, in the order it first appears. An empty key prints `(blank)`.
+A grouped table prints one table per distinct value, in the order it first appears. The group name and the column header both sit in the table head, so a group that crosses a page repeats its title and its columns. An empty key prints `(blank)`. The report total prints on the last group. `breakBeforeGroup` starts each later group on a new page. `keepGroupTogether` keeps a group on one page when it fits.
+
+Any block can set `pageBreakBefore` or `pageBreakAfter`.
 
 ```json
 {
@@ -194,6 +196,7 @@ A grouped table prints a heading for each distinct value, in the order it first 
   "id": "lines",
   "dataPath": "lines",
   "groupBy": "customer",
+  "breakBeforeGroup": true,
   "columns": [
     { "header": "Customer", "path": "customer" },
     { "header": "Amount", "path": "amount", "format": "0.00", "align": "right", "runningTotal": true }

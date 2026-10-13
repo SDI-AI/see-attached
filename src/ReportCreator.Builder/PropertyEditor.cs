@@ -19,6 +19,16 @@ internal static class PropertyEditor
             block.KeepTogether = value;
             preview();
         });
+        AddCheck(panel, "Page break before", block.PageBreakBefore, value =>
+        {
+            block.PageBreakBefore = value;
+            preview();
+        });
+        AddCheck(panel, "Page break after", block.PageBreakAfter, value =>
+        {
+            block.PageBreakAfter = value;
+            preview();
+        });
         AddShowWhen(panel, block, preview);
 
         switch (block)
@@ -57,6 +67,16 @@ internal static class PropertyEditor
             case TableBlock table:
                 AddText(panel, "Data path", table.DataPath, value => table.DataPath = value, preview, multiline: false);
                 AddText(panel, "Group by", table.GroupBy ?? "", value => table.GroupBy = Blank(value), preview, multiline: false);
+                AddCheck(panel, "Break before group", table.BreakBeforeGroup, value =>
+                {
+                    table.BreakBeforeGroup = value;
+                    preview();
+                });
+                AddCheck(panel, "Keep group together", table.KeepGroupTogether, value =>
+                {
+                    table.KeepGroupTogether = value;
+                    preview();
+                });
                 AddCheck(panel, "Show header", table.ShowHeader, value =>
                 {
                     table.ShowHeader = value;

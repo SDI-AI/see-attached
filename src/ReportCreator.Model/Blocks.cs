@@ -29,6 +29,10 @@ public abstract class Block
 
     public bool KeepTogether { get; set; }
 
+    public bool PageBreakBefore { get; set; }
+
+    public bool PageBreakAfter { get; set; }
+
     public ShowWhen? When { get; set; }
 }
 
@@ -119,6 +123,10 @@ public sealed class TableBlock : Block
     public bool ShowHeader { get; set; } = true;
 
     public string? GroupBy { get; set; }
+
+    public bool BreakBeforeGroup { get; set; }
+
+    public bool KeepGroupTogether { get; set; }
 
     public List<TableColumn> Columns { get; set; } = [];
 

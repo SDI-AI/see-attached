@@ -445,6 +445,61 @@ public class ReportTests
         Assert.Contains(">Subtotal<", html, StringComparison.Ordinal);
         Assert.Contains(">7.00<", html, StringComparison.Ordinal);
         Assert.Contains("group-head", html, StringComparison.Ordinal);
+        Assert.Equal(2, html.Split("<table class=\"group\">", StringSplitOptions.None).Length - 1);
+        Assert.Contains("<th colspan=\"2\">Ada</th>", html, StringComparison.Ordinal);
+        Assert.Contains("<th colspan=\"2\">Bea</th>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageBreaks_MarkTheBlockAndEachLaterGroup()
+    {
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TextBlock { Id = "note", Text = "Cover", PageBreakAfter = true },
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        GroupBy = "customer",
+                        PageBreakBefore = true,
+                        BreakBeforeGroup = true,
+                        KeepGroupTogether = true,
+                        Columns =
+                        [
+                            new TableColumn { Header = "Customer", Path = "customer" },
+                            new TableColumn { Header = "Amount", Path = "amount", Format = "0.00" }
+                        ],
+                        Aggregates = [new TableAggregate { Label = "Total", ColumnPath = "amount", Kind = AggregateKind.Sum, Format = "0.00" }]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            lines = new[]
+            {
+                new { customer = "Ada", amount = 1 },
+                new { customer = "Bea", amount = 2 }
+            }
+        });
+
+        var html = ReportCompiler.Compile(definition, data, new CompileOptions { Culture = CultureInfo.InvariantCulture });
+
+        Assert.Contains("break-before: page", html, StringComparison.Ordinal);
+        Assert.Contains("page-break-before: always", html, StringComparison.Ordinal);
+        Assert.Contains("break-after: page", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"block break-after\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"block groups break-before\"", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"group-wrap keep\"><table class=\"group\">", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"group-wrap keep break-before\"><table class=\"group\">", html, StringComparison.Ordinal);
+        Assert.Contains("<tr class=\"group-head\"><th colspan=\"2\">Ada</th></tr><tr><th class=\"left\">Customer</th>", html, StringComparison.Ordinal);
+        Assert.Contains("<tr class=\"group-head\"><th colspan=\"2\">Bea</th></tr><tr><th class=\"left\">Customer</th>", html, StringComparison.Ordinal);
+        Assert.Equal(1, html.Split(">Total<", StringSplitOptions.None).Length - 1);
+        Assert.Contains(">3.00<", html, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -158,6 +158,64 @@ public class PdfExportTests
         Assert.Contains("Acme Statement", pages[0], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Export_BreaksBeforeTheNextGroupAndRepeatsItsTitle()
+    {
+        var rows = new List<object>
+        {
+            new { customer = "GROUP-SHORT", description = "Short line", amount = 1 },
+            new { customer = "GROUP-SHORT", description = "Short line 2", amount = 2 }
+        };
+        for (var index = 1; index <= 48; index++)
+        {
+            rows.Add(index == 24
+                ? new { customer = "GROUP-LONG", description = "ROW-KEEP-TOGETHER", amount = 4242 }
+                : new { customer = "GROUP-LONG", description = "Line " + index.ToString(CultureInfo.InvariantCulture), amount = index });
+        }
+
+        var definition = new ReportDefinition
+        {
+            Name = "Statement",
+            Page = new PageSetup { PageHeaderMm = 12 },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "Acme Statement" }] },
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        GroupBy = "customer",
+                        BreakBeforeGroup = true,
+                        Columns =
+                        [
+                            new TableColumn { Header = "Description", Path = "description" },
+                            new TableColumn { Header = "Amount", Path = "amount", Align = TextAlign.Right }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { lines = rows });
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.InvariantCulture
+        });
+
+        var pages = ExtractPages(await exporter.ExportAsync(definition, data, TestContext.Current.CancellationToken));
+        var longPages = pages.Where(page => page.Contains("GROUP-LONG", StringComparison.Ordinal)).ToList();
+
+        Assert.True(pages.Count >= 3, "Expected the long group to cross a page after the short group, got " + pages.Count + ".");
+        Assert.Contains("GROUP-SHORT", pages[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("GROUP-LONG", pages[0], StringComparison.Ordinal);
+        Assert.True(longPages.Count >= 2, "Expected the long group title on at least two pages, got " + longPages.Count + ".");
+        Assert.All(pages, page => Assert.Contains("Acme Statement", page, StringComparison.Ordinal));
+        var kept = pages.Single(page => page.Contains("ROW-KEEP-TOGETHER", StringComparison.Ordinal));
+        Assert.Contains("4242", kept, StringComparison.Ordinal);
+        Assert.Contains("GROUP-LONG", kept, StringComparison.Ordinal);
+    }
+
     private static string Fixture(string name) =>
         Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice", name);
 

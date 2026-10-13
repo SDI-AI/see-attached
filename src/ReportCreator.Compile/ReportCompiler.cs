@@ -81,13 +81,12 @@ public static partial class ReportCompiler
         if (!IsShown(block, definition, data, options))
             return;
 
-        var selected = block.Id == options.SelectedId ? " rc-selected" : "";
-        var keep = block.KeepTogether ? " keep" : "";
+        var flags = Flags(block, options);
         switch (block)
         {
             case TextBlock text:
                 html.Append("<div class=\"block")
-                    .Append(keep).Append(selected)
+                    .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(text.Id))
                     .Append("\" style=\"").Append(StyleOf(text.FontSizePt, text.Bold, text.Color, text.Align))
                     .Append("\">")
@@ -97,7 +96,7 @@ public static partial class ReportCompiler
             case FieldBlock field:
                 var fieldText = ResolveText(field.Path, field.Format, definition, data, options);
                 html.Append("<div class=\"block")
-                    .Append(keep).Append(selected)
+                    .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(field.Id))
                     .Append("\" style=\"").Append(StyleOf(field.FontSizePt, field.Bold, field.Color, field.Align))
                     .Append("\">")
@@ -106,7 +105,7 @@ public static partial class ReportCompiler
                 break;
             case ImageBlock image:
                 html.Append("<img class=\"block")
-                    .Append(keep).Append(selected)
+                    .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(image.Id))
                     .Append("\" alt=\"").Append(Encode(image.Alt))
                     .Append('"');
@@ -123,14 +122,14 @@ public static partial class ReportCompiler
                 break;
             case SpacerBlock spacer:
                 html.Append("<div class=\"block spacer")
-                    .Append(keep).Append(selected)
+                    .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(spacer.Id))
                     .Append("\" style=\"height:").Append(Num(spacer.HeightMm)).Append("mm\"></div>");
                 break;
             case ColumnsBlock columns:
                 html.Append("<div class=\"block cols cols-")
                     .Append(columns.Columns.Count.ToString(CultureInfo.InvariantCulture))
-                    .Append(keep).Append(selected)
+                    .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(columns.Id))
                     .Append("\">");
                 foreach (var column in columns.Columns)
@@ -143,89 +142,152 @@ public static partial class ReportCompiler
                 html.Append("</div>");
                 break;
             case TableBlock table:
-                RenderTable(html, table, data, options, keep, selected);
+                RenderTable(html, table, data, options, flags);
                 break;
         }
     }
 
-    private static void RenderTable(StringBuilder html, TableBlock table, JsonElement data, CompileOptions options, string keep, string selected)
+    private static string Flags(Block block, CompileOptions options)
+    {
+        var flags = "";
+        if (block.KeepTogether)
+            flags += " keep";
+        if (block.PageBreakBefore)
+            flags += " break-before";
+        if (block.PageBreakAfter)
+            flags += " break-after";
+        if (block.Id == options.SelectedId)
+            flags += " rc-selected";
+        return flags;
+    }
+
+    private static void RenderTable(StringBuilder html, TableBlock table, JsonElement data, CompileOptions options, string flags)
     {
         var rows = Rows(data, table.DataPath);
-        html.Append("<table class=\"block")
-            .Append(keep).Append(selected)
-            .Append("\" data-id=\"").Append(Encode(table.Id)).Append("\">");
-        if (table.ShowHeader)
+        var groups = string.IsNullOrWhiteSpace(table.GroupBy) ? [] : Groups(rows, table.GroupBy);
+        if (groups.Count == 0)
         {
-            html.Append("<thead><tr>");
-            foreach (var column in table.Columns)
-            {
-                html.Append("<th class=\"").Append(AlignClass(column.Align)).Append('"');
-                if (column.WidthMm is decimal width)
-                    html.Append(" style=\"width:").Append(Num(width)).Append("mm\"");
-                html.Append('>').Append(Encode(column.Header)).Append("</th>");
-            }
-            html.Append("</tr></thead>");
+            WriteTable(html, table, rows, rows, options, "block" + flags, table.Id, groupTitle: null);
+            return;
         }
 
-        html.Append("<tbody>");
-        var running = new decimal[table.Columns.Count];
-        foreach (var group in Groups(rows, table.GroupBy))
+        html.Append("<div class=\"block groups").Append(flags).Append("\" data-id=\"").Append(Encode(table.Id)).Append("\">");
+        for (var index = 0; index < groups.Count; index++)
         {
-            Array.Clear(running);
-            if (!string.IsNullOrWhiteSpace(table.GroupBy))
+            var wrap = "group-wrap";
+            if (table.KeepGroupTogether)
+                wrap += " keep";
+            if (table.BreakBeforeGroup && index > 0)
+                wrap += " break-before";
+            html.Append("<div class=\"").Append(wrap).Append("\">");
+            WriteTable(
+                html,
+                table,
+                groups[index],
+                index == groups.Count - 1 ? rows : null,
+                options,
+                "group",
+                id: null,
+                GroupTitle(groups[index], table.GroupBy!, options.Culture));
+            html.Append("</div>");
+        }
+
+        html.Append("</div>");
+    }
+
+    private static void WriteTable(
+        StringBuilder html,
+        TableBlock table,
+        List<JsonElement> rows,
+        List<JsonElement>? reportRows,
+        CompileOptions options,
+        string className,
+        string? id,
+        string? groupTitle)
+    {
+        html.Append("<table class=\"").Append(className).Append('"');
+        if (id is not null)
+            html.Append(" data-id=\"").Append(Encode(id)).Append('"');
+        html.Append('>');
+        if (groupTitle is not null || table.ShowHeader)
+        {
+            html.Append("<thead>");
+            if (groupTitle is not null)
             {
-                var key = DataValues.TryResolve(group[0], table.GroupBy, out var keyValue)
-                    ? DataValues.Format(keyValue, null, options.Culture)
-                    : "";
-                html.Append("<tr class=\"group-head\"><td colspan=\"")
+                html.Append("<tr class=\"group-head\"><th colspan=\"")
                     .Append(table.Columns.Count.ToString(CultureInfo.InvariantCulture))
                     .Append("\">")
-                    .Append(Encode(key.Length == 0 ? "(blank)" : key))
-                    .Append("</td></tr>");
+                    .Append(Encode(groupTitle))
+                    .Append("</th></tr>");
             }
 
-            foreach (var row in group)
+            if (table.ShowHeader)
             {
                 html.Append("<tr>");
-                for (var index = 0; index < table.Columns.Count; index++)
+                foreach (var column in table.Columns)
                 {
-                    var column = table.Columns[index];
-                    string cell;
-                    if (column.RunningTotal)
-                    {
-                        if (DataValues.TryResolve(row, column.Path, out var amount) && DataValues.AsDecimal(amount) is decimal number)
-                            running[index] += number;
-                        cell = DataValues.Format(JsonSerializer.SerializeToElement(running[index]), column.Format, options.Culture);
-                    }
-                    else
-                    {
-                        cell = DataValues.TryResolve(row, column.Path, out var value)
-                            ? DataValues.Format(value, column.Format, options.Culture)
-                            : "";
-                    }
-
-                    html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
-                        .Append(Encode(cell))
-                        .Append("</td>");
+                    html.Append("<th class=\"").Append(AlignClass(column.Align)).Append('"');
+                    if (column.WidthMm is decimal width)
+                        html.Append(" style=\"width:").Append(Num(width)).Append("mm\"");
+                    html.Append('>').Append(Encode(column.Header)).Append("</th>");
                 }
 
                 html.Append("</tr>");
             }
 
-            if (table.GroupAggregates.Count > 0)
-                AppendAggregateRow(html, table.Columns, table.GroupAggregates, group, options.Culture, "group-foot");
+            html.Append("</thead>");
         }
 
+        html.Append("<tbody>");
+        var running = new decimal[table.Columns.Count];
+        foreach (var row in rows)
+        {
+            html.Append("<tr>");
+            for (var index = 0; index < table.Columns.Count; index++)
+            {
+                var column = table.Columns[index];
+                string cell;
+                if (column.RunningTotal)
+                {
+                    if (DataValues.TryResolve(row, column.Path, out var amount) && DataValues.AsDecimal(amount) is decimal number)
+                        running[index] += number;
+                    cell = DataValues.Format(JsonSerializer.SerializeToElement(running[index]), column.Format, options.Culture);
+                }
+                else
+                {
+                    cell = DataValues.TryResolve(row, column.Path, out var value)
+                        ? DataValues.Format(value, column.Format, options.Culture)
+                        : "";
+                }
+
+                html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
+                    .Append(Encode(cell))
+                    .Append("</td>");
+            }
+
+            html.Append("</tr>");
+        }
+
+        if (table.GroupAggregates.Count > 0)
+            AppendAggregateRow(html, table.Columns, table.GroupAggregates, rows, options.Culture, "group-foot");
         html.Append("</tbody>");
 
-        if (table.Aggregates.Count > 0)
+        if (reportRows is not null && table.Aggregates.Count > 0)
         {
             html.Append("<tfoot>");
-            AppendAggregateRow(html, table.Columns, table.Aggregates, rows, options.Culture, null);
+            AppendAggregateRow(html, table.Columns, table.Aggregates, reportRows, options.Culture, null);
             html.Append("</tfoot>");
         }
 
         html.Append("</table>");
+    }
+
+    private static string GroupTitle(List<JsonElement> group, string groupBy, CultureInfo culture)
+    {
+        var key = DataValues.TryResolve(group[0], groupBy, out var keyValue)
+            ? DataValues.Format(keyValue, null, culture)
+            : "";
+        return key.Length == 0 ? "(blank)" : key;
     }
 
     private static List<JsonElement> Rows(JsonElement data, string path)
@@ -453,9 +515,13 @@ public static partial class ReportCompiler
         }
         .block { margin: 0 0 2mm; }
         .block:last-child { margin-bottom: 0; }
-        .keep, tr { break-inside: avoid; }
+        .keep, tr { break-inside: avoid; page-break-inside: avoid; }
+        .break-before { break-before: page; page-break-before: always; }
+        .break-after { break-after: page; page-break-after: always; }
+        .group-wrap { margin: 0 0 4mm; }
+        .group-wrap:last-child { margin-bottom: 0; }
         tr.group-head { break-after: avoid; }
-        tr.group-head td { font-weight: 700; background: #f9fafb; border-bottom: 0.3mm solid #111827; }
+        tr.group-head th, tr.group-head td { font-weight: 700; background: #f9fafb; border-bottom: 0.3mm solid #111827; }
         tr.group-foot td { font-weight: 700; border-top: 0.2mm solid #9ca3af; }
         .cols { display: grid; gap: 8mm; }
         .cols-2 { grid-template-columns: 1fr 1fr; }
