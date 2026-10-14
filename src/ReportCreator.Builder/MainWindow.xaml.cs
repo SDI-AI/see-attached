@@ -21,14 +21,15 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private ReportDefinition _definition = new();
+    private DataDocument _document = new() { Values = JsonSerializer.SerializeToElement(new { }) };
     private JsonElement _data = JsonSerializer.SerializeToElement(new { });
     private string? _path;
+    private string? _dataPath;
     private string? _previewFile;
     private Task<ReportPdfExporter>? _launch;
     private int _previewVersion;
     private bool _webReady;
     private bool _suppress;
-    private bool _suppressData;
     private bool _busy;
 
     public MainWindow()
@@ -84,12 +85,14 @@ public partial class MainWindow : Window
     private void Sample_Click(object sender, RoutedEventArgs e)
     {
         _path = null;
+        _dataPath = null;
         _definition = ReportJson.Read(ReadEmbedded("invoice.definition.json"));
+        _document = new DataDocument { Name = "Invoice", Values = EmptyObject() };
         SetData(ReportJson.ReadData(ReadEmbedded("invoice.data.json")));
         Normalize(_definition);
         UpdateChrome();
         RefreshList(_definition.Body.Blocks.FirstOrDefault()?.Id);
-        Status.Text = "Invoice sample. Data is loaded for preview only.";
+        Status.Text = "Invoice sample. The data stays separate, so another report can use it.";
     }
 
     private void Open_Click(object sender, RoutedEventArgs e)
@@ -117,20 +120,67 @@ public partial class MainWindow : Window
 
     private void OpenData_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Filter = "JSON data (*.json)|*.json" };
+        var dialog = new OpenFileDialog { Filter = "Data (*.rcdata;*.json)|*.rcdata;*.json" };
         if (dialog.ShowDialog() != true)
             return;
 
         try
         {
-            SetData(ReportJson.ReadData(File.ReadAllText(dialog.FileName)));
+            var json = File.ReadAllText(dialog.FileName);
+            var document = DataJson.ReadAny(json);
+            if (!DataJson.IsDocument(json))
+            {
+                var name = Path.GetFileNameWithoutExtension(dialog.FileName);
+                document.Name = string.IsNullOrWhiteSpace(name) ? "Data" : name;
+            }
+
+            var errors = DataValidator.Validate(document);
+            _dataPath = dialog.FileName;
+            ReplaceDocument(document);
             SchedulePreview();
-            Status.Text = "Preview data loaded.";
+            var file = Path.GetFileName(dialog.FileName);
+            if (errors.Count > 0)
+            {
+                Status.Text = "Opened " + file + ". Fix the data before you save it.";
+                MessageBox.Show(this, string.Join(Environment.NewLine, errors), "Open data");
+                return;
+            }
+
+            Status.Text = "Opened " + file + ". Any report can use these values.";
         }
         catch (Exception exception)
         {
             MessageBox.Show(this, exception.Message, "Open data");
         }
+    }
+
+    private void NewData_Click(object sender, RoutedEventArgs e)
+    {
+        _dataPath = null;
+        ReplaceDocument(new DataDocument { Name = "Data", Values = EmptyObject() });
+        SchedulePreview();
+        Status.Text = "New data. The report was kept.";
+    }
+
+    private void SaveData_Click(object sender, RoutedEventArgs e)
+    {
+        if (_dataPath is null || !_dataPath.EndsWith(".rcdata", StringComparison.OrdinalIgnoreCase))
+            SaveDataAs_Click(sender, e);
+        else
+            WriteData(_dataPath);
+    }
+
+    private void SaveDataAs_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Data (*.rcdata)|*.rcdata",
+            FileName = DataFileName(_document.Name),
+            DefaultExt = ".rcdata",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog() == true)
+            WriteData(dialog.FileName);
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -213,7 +263,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            SetData(ReportBindings.MergeMissing(_data, ReportBindings.Sample(_definition)));
+            ReportBindings.Include(_document, _definition);
+            CommitData();
             SchedulePreview();
             Status.Text = "Missing fields inserted. Existing values were kept.";
         }
@@ -223,23 +274,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DataBox_LostFocus(object sender, RoutedEventArgs e)
+    private void EditData_Click(object sender, RoutedEventArgs e)
     {
-        if (_suppressData)
+        var dialog = new DataWindow(_document) { Owner = this };
+        if (dialog.ShowDialog() != true)
             return;
-
-        try
-        {
-            var data = ReportJson.ReadData(DataBox.Text);
-            if (JsonSerializer.Serialize(data, ReportJson.Options) == JsonSerializer.Serialize(_data, ReportJson.Options))
-                return;
-            _data = data;
-            SchedulePreview();
-        }
-        catch (JsonException exception)
-        {
-            Status.Text = exception.Message;
-        }
+        _document = dialog.Document;
+        CommitData();
+        SchedulePreview();
+        Status.Text = "Data updated.";
     }
 
     private void Add_Click(object sender, RoutedEventArgs e)
@@ -272,8 +315,9 @@ public partial class MainWindow : Window
     private void LoadNew()
     {
         _path = null;
+        _dataPath = null;
         _definition = new ReportDefinition();
-        SetData(JsonSerializer.SerializeToElement(new { }));
+        ReplaceDocument(new DataDocument { Name = "Data", Values = EmptyObject() });
         _definition.Header.Blocks.Add(new ModelText { Id = NewId(), Text = "Report", Bold = true, FontSizePt = 22 });
         UpdateChrome();
         RefreshList(_definition.Header.Blocks[0].Id);
@@ -410,10 +454,60 @@ public partial class MainWindow : Window
 
     private void SetData(JsonElement data)
     {
-        _data = data;
-        _suppressData = true;
-        DataBox.Text = JsonSerializer.Serialize(data, ReportJson.Options);
-        _suppressData = false;
+        _document = DataJson.Adopt(_document, data);
+        CommitData();
+    }
+
+    private void ReplaceDocument(DataDocument document)
+    {
+        _document = document;
+        CommitData();
+    }
+
+    private void CommitData()
+    {
+        _data = _document.Values.Clone();
+        RefreshDataHeading();
+    }
+
+    private void WriteData(string path)
+    {
+        try
+        {
+            if (!path.EndsWith(".rcdata", StringComparison.OrdinalIgnoreCase))
+                path += ".rcdata";
+
+            var errors = DataValidator.Validate(_document);
+            if (errors.Count > 0)
+            {
+                MessageBox.Show(this, string.Join(Environment.NewLine, errors), "Save data");
+                return;
+            }
+
+            File.WriteAllText(path, DataJson.Write(_document));
+            _dataPath = path;
+            RefreshDataHeading();
+            Status.Text = "Saved " + Path.GetFileName(path) + ".";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Save data");
+        }
+    }
+
+    private void RefreshDataHeading()
+    {
+        var place = _dataPath is null ? "unsaved" : Path.GetFileName(_dataPath);
+        DataHeading.Text = "DATA  /  " + place;
+    }
+
+    private static JsonElement EmptyObject() => JsonSerializer.SerializeToElement(new { });
+
+    private static string DataFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var file = string.Concat(name.Select(character => invalid.Contains(character) ? '_' : character)).Trim();
+        return string.IsNullOrWhiteSpace(file) ? "data" : file;
     }
 
     private static void TryDelete(string? path)

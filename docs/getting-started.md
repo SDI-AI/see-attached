@@ -1,6 +1,6 @@
 # Setup and creating reports
 
-See Attached builds the report that rides along as an attachment. The definition is the layout, saved as JSON. The data is a separate JSON object. .NET binds them and compiles one HTML file. A browser shows that HTML. Playwright prints the same HTML to PDF.
+See Attached builds the report that rides along as an attachment. The definition is the layout, saved as JSON. The data is a separate JSON object. A `.rcdata` file stores that object with field types, and more than one report can compile it. .NET binds them and compiles one HTML file. A browser shows that HTML. Playwright prints the same HTML to PDF.
 
 The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds.
 
@@ -51,7 +51,7 @@ The window has the block list on the left, the PDF preview in the middle, and th
 3. In the block list, pick Header, Body, Footer, Page header, or Page footer, pick a block kind, and click **Add**.
 4. Select the block and edit it in the property panel.
 5. Use **Up**, **Down**, and **Delete** to reorder the list.
-6. Open the **Data** expander to edit the preview JSON. **Insert missing fields** adds paths the report binds and leaves values you already typed. Choose **File → Open data** and pick a JSON object such as `fixtures/invoice/data.json`. That data is for the preview. Save does not write it into the report file.
+6. Open the **Data** expander. It shows the data file name. **Edit data** opens one window. The left side is a tree of nodes, starting at the data document. **+** on the root, an object, or a **1:N** adds a field under that node. An object nests its fields. Set a nested field to **1:N** to make a collection, such as `invoice.items`: `invoice` is one object, and `items` is the collection on it. The tree under that collection is the fields on every item. Select a node to edit its name and type in the same window. A leaf that is not inside a 1:N has one sample value. A 1:N node edits the sample items. **Insert missing fields** adds paths this report binds and leaves values you already typed. **Open** and **Save**, or **File → Open data** and **File → Save data**, load and write `.rcdata`. Open still accepts a plain JSON object such as `fixtures/invoice/data.json`. That file is not stored in the report. Open the same data with another report and it compiles the same values. **File → Save** writes the layout only.
 7. Choose **File → Save as**. A `.json` file is the definition. A `.rcreport` file is a zip that contains `definition.json`.
 8. Choose **File → Export HTML** or **File → Export PDF**.
 
@@ -338,6 +338,56 @@ var data = JsonSerializer.SerializeToElement(new
     }
 }, ReportJson.Options);
 ```
+
+### A data file other reports can use
+
+Save the values with their types. The report does not point at this file. `Compile` still takes the values object, so a second report can use the same file.
+
+```json
+{
+  "kind": "data",
+  "schemaVersion": 1,
+  "name": "Invoice",
+  "fields": [
+    {
+      "name": "invoice",
+      "type": "object",
+      "fields": [
+        { "name": "number", "type": "string" },
+        { "name": "date", "type": "date" }
+      ]
+    },
+    {
+      "name": "lines",
+      "type": "array",
+      "fields": [
+        { "name": "description", "type": "string" },
+        { "name": "amount", "type": "number" }
+      ]
+    }
+  ],
+  "values": {}
+}
+```
+
+A date is `yyyy-MM-dd` or empty. A number is a JSON number, not a numeric string. A bool is `true` or `false`. An array is a list of objects.
+
+```csharp
+using System.Globalization;
+using ReportCreator.Compile;
+using ReportCreator.Model;
+
+var document = DataJson.FromValues(data, "Invoice");
+File.WriteAllText("invoice.rcdata", DataJson.Write(document));
+
+var values = DataJson.ReadValues(File.ReadAllText("invoice.rcdata"));
+var html = ReportCompiler.Compile(definition, values, new CompileOptions
+{
+    Culture = CultureInfo.GetCultureInfo("en-US")
+});
+```
+
+`ReadValues` accepts a `.rcdata` document or a plain JSON object. It rejects a report layout. `FromValues` reads the JSON kinds and builds the field list. Pass `document.Values` to `Compile` and to `ExportAsync`.
 
 ### PDF
 

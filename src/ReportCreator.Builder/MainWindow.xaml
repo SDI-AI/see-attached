@@ -23,9 +23,13 @@
                         <MenuItem Header="_New" Click="New_Click" />
                         <MenuItem Header="New _invoice sample" Click="Sample_Click" />
                         <MenuItem Header="_Open..." Click="Open_Click" />
-                        <MenuItem Header="Open _data..." Click="OpenData_Click" />
                         <MenuItem Header="_Save" Click="Save_Click" />
                         <MenuItem Header="Save _as..." Click="SaveAs_Click" />
+                        <Separator />
+                        <MenuItem Header="Open _data..." Click="OpenData_Click" />
+                        <MenuItem Header="Ne_w data" Click="NewData_Click" />
+                        <MenuItem Header="Sa_ve data" Click="SaveData_Click" />
+                        <MenuItem Header="Save data as..." Click="SaveDataAs_Click" />
                         <Separator />
                         <MenuItem Header="Export _HTML..." Click="ExportHtml_Click" />
                         <MenuItem Header="Export _PDF..." Click="ExportPdf_Click" />
@@ -154,14 +158,16 @@
             <Border Grid.Column="2" Background="{StaticResource Paper}" BorderBrush="#26171717" BorderThickness="1,0,0,0">
                 <DockPanel Margin="20,18,18,16">
                     <TextBlock x:Name="PropertiesHeading" DockPanel.Dock="Top" Style="{StaticResource Eyebrow}" Text="PROPERTIES" />
-                    <Expander DockPanel.Dock="Bottom" IsExpanded="False" Margin="0,12,0,0">
+                    <Expander DockPanel.Dock="Bottom" IsExpanded="True" Margin="0,12,0,0">
                         <Expander.Header>
-                            <TextBlock Text="DATA" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource Muted}" />
+                            <TextBlock x:Name="DataHeading" Text="DATA  /  unsaved" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource Muted}" />
                         </Expander.Header>
-                        <DockPanel Margin="0,8,0,0">
-                            <Button DockPanel.Dock="Bottom" Content="Insert missing fields" Style="{StaticResource QuietButton}" Margin="0,8,0,0" Click="FillData_Click" />
-                            <TextBox x:Name="DataBox" Style="{StaticResource FieldBox}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="140" MaxHeight="220" VerticalScrollBarVisibility="Auto" LostFocus="DataBox_LostFocus" />
-                        </DockPanel>
+                        <StackPanel Margin="0,8,0,0">
+                            <Button Content="Edit data" Style="{StaticResource InkButton}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="EditData_Click" />
+                            <Button Content="Open" Style="{StaticResource QuietButton}" Click="OpenData_Click" />
+                            <Button Content="Save" Style="{StaticResource QuietButton}" Click="SaveData_Click" />
+                            <Button Content="Insert missing fields" Style="{StaticResource QuietButton}" Click="FillData_Click" />
+                        </StackPanel>
                     </Expander>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="Properties" />

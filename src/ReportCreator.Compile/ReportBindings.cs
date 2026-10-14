@@ -70,6 +70,44 @@ public static partial class ReportBindings
         return root.ToElement();
     }
 
+    public static void Include(DataDocument document, ReportDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(definition);
+        foreach (var binding in List(definition))
+        {
+            if (PrintPaths.IsPrintField(binding.Path) || PrintPaths.TryParameterName(binding.Path, out _))
+                continue;
+
+            var type = TypeFor(binding.Format);
+            if (binding.Kind == ReportBindingKind.Table)
+                DataEdit.Ensure(document, binding.Path, DataFieldType.Array);
+            else if (binding.Kind is ReportBindingKind.Column or ReportBindingKind.Group)
+                DataEdit.EnsureColumn(document, binding.TablePath ?? "", binding.Path, binding.Kind == ReportBindingKind.Group ? DataFieldType.String : type);
+            else
+                DataEdit.Ensure(document, binding.Path, type);
+        }
+
+        document.Values = MergeMissing(document.Values, Sample(definition));
+    }
+
+    private static DataFieldType TypeFor(string? format)
+    {
+        if (string.IsNullOrWhiteSpace(format))
+            return DataFieldType.String;
+        if (format.Contains('y') || format.Contains('M') || format.Contains('d'))
+            return DataFieldType.Date;
+        try
+        {
+            _ = 1.5m.ToString(format, CultureInfo.InvariantCulture);
+            return DataFieldType.Number;
+        }
+        catch (FormatException)
+        {
+            return DataFieldType.String;
+        }
+    }
+
     public static JsonElement MergeMissing(JsonElement existing, JsonElement sample)
     {
         if (existing.ValueKind != JsonValueKind.Object)

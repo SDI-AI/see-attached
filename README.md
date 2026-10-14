@@ -48,11 +48,17 @@ Not in this version: charts, barcodes, rich text, expressions, right-to-left lay
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
 
+## What 1.21 adds
+
+- A data file is its own typed JSON document, saved as `.rcdata`. It is not stored inside the report, and any report can compile its values.
+- Fields are string, number, date, bool, object, or array. An array is a list of rows. A date is `yyyy-MM-dd` or empty. A number is a JSON number.
+- The data file holds a sample schema and sample values together. Edit data opens one window. The left side is a tree of nodes. A plus on the root, an object, or a 1:N adds a field under that node. A collection such as `invoice.items` is a 1:N nested under the invoice object. The right side edits the selected node: name, type, and, for an object, relationship One or 1:N. A leaf that is not inside a 1:N has one sample value. A 1:N node edits the sample items. Open still accepts a plain JSON object of values. Insert missing fields adds paths from the open report and keeps values already set.
+
 ## Projects
 
 | Project | Role |
 | --- | --- |
-| `src/ReportCreator.Model` | Papers, validation, JSON model |
+| `src/ReportCreator.Model` | Papers, validation, JSON model, typed data documents |
 | `src/ReportCreator.Compile` | Definition plus data to HTML |
 | `src/ReportCreator.Pdf` | Playwright PDF export |
 | `src/ReportCreator.Blazor` | Iframe viewer component |
@@ -106,7 +112,7 @@ npm run dev
 
 `npm install` and `npm run dev` must run inside `samples/viewer-next`. Do not add a `package.json` at the repository root. Next.js 16 added `@types/node` 26.6.5 as a sample dev dependency the first time `next build` saw TypeScript. It is not used by the .NET libraries.
 
-The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, page numbers, and whether page 1 is numbered. Select a block in the list and edit it in the property panel. The Data expander edits the sample JSON and can insert fields the report binds but the JSON does not have yet. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
+The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, open and save a `.rcdata` data file, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, page numbers, and whether page 1 is numbered. Select a block in the list and edit it in the property panel. The Data expander shows the data file name. Edit data opens one window: a tree of nodes on the left, and the selected node on the right. A plus on the root, an object, or a 1:N adds a field under that node. A collection such as invoice.items is a 1:N nested under the invoice object. The sample values live in that same file. Insert missing fields adds paths the open report binds and leaves values already set. The same data file can be opened with another report. Saving the report does not write the data into it. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
 
 ## PDF on Azure
 

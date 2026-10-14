@@ -1,0 +1,100 @@
+<Window x:Class="ReportCreator.Builder.DataWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Data" Width="960" Height="680"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource Paper}" FontFamily="Segoe UI" FontSize="14" Foreground="{StaticResource Ink}">
+    <DockPanel Margin="22">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" IsCancel="True" Style="{StaticResource QuietButton}" Margin="0,0,8,0" />
+                <Button Content="OK" IsDefault="True" Style="{StaticResource InkButton}" Click="Ok_Click" />
+            </StackPanel>
+        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="360" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Column="0" Margin="0,0,16,0">
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource Eyebrow}" Text="NODES" />
+                <TreeView x:Name="NodeTree" BorderBrush="{StaticResource Line}" BorderThickness="1" Background="White"
+                          VirtualizingPanel.IsVirtualizing="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          SelectedItemChanged="NodeTree_SelectedItemChanged">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Setter Property="Padding" Value="0,2" />
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal">
+                                <Button ToolTip="Add a field under this node" VerticalAlignment="Center"
+                                        PreviewMouseLeftButtonDown="AddChild_PreviewMouseLeftButtonDown">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Focusable" Value="False" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,6,0" />
+                                            <Setter Property="Cursor" Value="Hand" />
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <TextBlock Text="+" FontSize="16" FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource Blue}" VerticalAlignment="Center" />
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CanAdd}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <TextBlock Text="{Binding Title, Mode=OneWay}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Detail, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+            <DockPanel Grid.Column="1">
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource Eyebrow}" Text="NODE" />
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <StackPanel x:Name="RootPanel">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Data name" Margin="0,0,0,4" />
+                            <TextBox x:Name="RootNameBox" Style="{StaticResource FieldBox}" LostFocus="RootNameBox_LostFocus" />
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Muted}" Text="Use + on a node to add a field under it. An object nests fields. Set a child to 1:N for a collection, such as invoice.items." />
+                        </StackPanel>
+                        <StackPanel x:Name="FieldPanel" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Name" Margin="0,0,0,4" />
+                            <TextBox x:Name="NameBox" Style="{StaticResource FieldBox}" LostFocus="NameBox_LostFocus" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Type" />
+                            <ComboBox x:Name="TypeBox" Style="{StaticResource FieldCombo}" SelectionChanged="TypeBox_SelectionChanged" />
+                            <TextBlock x:Name="RelationLabel" Style="{StaticResource FieldLabel}" Text="Relationship" />
+                            <ComboBox x:Name="RelationBox" Style="{StaticResource FieldCombo}" SelectionChanged="RelationBox_SelectionChanged" />
+                            <TextBlock x:Name="ValueLabel" Style="{StaticResource FieldLabel}" Text="Value" />
+                            <TextBox x:Name="ValueBox" Style="{StaticResource FieldBox}" LostFocus="ValueBox_LostFocus" />
+                            <ComboBox x:Name="BoolBox" Style="{StaticResource FieldCombo}" SelectionChanged="BoolBox_SelectionChanged" />
+                            <TextBlock x:Name="ItemsLabel" Style="{StaticResource FieldLabel}" Text="Items" />
+                            <StackPanel x:Name="ItemsHost" />
+                            <Button x:Name="AddItemButton" Content="Add item" Style="{StaticResource QuietButton}" Margin="0,4,0,8" Click="AddItem_Click" />
+                            <TextBlock x:Name="NoteText" TextWrapping="Wrap" Margin="0,4,0,8" Foreground="{StaticResource Muted}" />
+                            <Button x:Name="DeleteButton" Content="Delete" Style="{StaticResource QuietButton}" Click="Delete_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>
