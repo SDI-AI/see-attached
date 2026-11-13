@@ -6,8 +6,10 @@ Reports are the attachment. The app gets the attention, and the invoice, the sta
 
 The file you save is JSON. HTML is only the render artifact. .NET binds the data and compiles one self-contained HTML file. A browser shows that file. Playwright prints the same HTML to PDF.
 
+This is not a Crystal Reports or RDLC converter. There is no import for `.rpt` or `.rdlc` files. You rebuild the report in JSON and bind a separate data file.
+
 ```
-definition.json + data.json
+definition.json + data.json or .rcdata
         │
         ▼
 ReportCreator.Compile (.NET 10)
@@ -22,6 +24,8 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
+Current version: 1.21. There is no NuGet package yet; clone the repo and reference the projects from source.
+
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
 ## What v1 does
@@ -33,8 +37,6 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - Images are `https` URLs or `data:image` PNG, JPEG, GIF, or WebP.
 - Print CSS sets `@page` size and margin, repeats a table header with `thead { display: table-header-group }`, and keeps a table row or a `keepTogether` block from splitting.
 - The WPF builder previews the real PDF. The Blazor and Next.js viewers show one paper-width column. Chromium inserts page breaks when that HTML is printed.
-
-Not in this version: charts, barcodes, rich text, expressions, right-to-left layout, and a free canvas.
 
 ## What 1.1 adds
 
@@ -53,6 +55,10 @@ Not in this version: charts, barcodes, rich text, expressions, right-to-left lay
 - A data file is its own typed JSON document, saved as `.rcdata`. It is not stored inside the report, and any report can compile its values.
 - Fields are string, number, date, bool, object, or array. An array is a list of rows. A date is `yyyy-MM-dd` or empty. A number is a JSON number.
 - The data file holds a sample schema and sample values together. Edit data opens one window. The left side is a tree of nodes. A plus on the root, an object, or a 1:N adds a field under that node. A collection such as `invoice.items` is a 1:N nested under the invoice object. The right side edits the selected node: name, type, and, for an object, relationship One or 1:N. A leaf that is not inside a 1:N has one sample value. A 1:N node edits the sample items. Open still accepts a plain JSON object of values. Insert missing fields adds paths from the open report and keeps values already set.
+
+## Not in this version
+
+Charts, barcodes, rich text, expressions, right-to-left layout, and a free canvas.
 
 ## Projects
 
