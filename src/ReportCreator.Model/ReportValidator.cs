@@ -35,11 +35,11 @@ public static partial class ReportValidator
 
         var parameters = ValidateParameters(definition, errors);
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        ValidateBand(definition.Header, "Header", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
-        ValidateBand(definition.Body, "Body", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
-        ValidateBand(definition.Footer, "Footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
-        ValidateBand(definition.PageHeader, "Page header", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
-        ValidateBand(definition.PageFooter, "Page footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
+        ValidateBand(definition.Header, "Header", errors, ids, parameters, columnDepth: 0, panelDepth: 0, repeatDepth: 0);
+        ValidateBand(definition.Body, "Body", errors, ids, parameters, columnDepth: 0, panelDepth: 0, repeatDepth: 0);
+        ValidateBand(definition.Footer, "Footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0, repeatDepth: 0);
+        ValidateBand(definition.PageHeader, "Page header", errors, ids, parameters, columnDepth: 0, panelDepth: 0, repeatDepth: 0);
+        ValidateBand(definition.PageFooter, "Page footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0, repeatDepth: 0);
         if (definition.Page is not null && definition.Page.Margin is not null && errors.All(error => !error.Contains("no room for content", StringComparison.Ordinal)))
             ValidateChromeRoom(definition, errors);
         return errors;
@@ -115,13 +115,13 @@ public static partial class ReportValidator
         return names;
     }
 
-    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth)
+    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth, int repeatDepth)
     {
         foreach (var block in band.Blocks)
-            ValidateBlock(block, scope, errors, ids, parameters, columnDepth, panelDepth);
+            ValidateBlock(block, scope, errors, ids, parameters, columnDepth, panelDepth, repeatDepth);
     }
 
-    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth)
+    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth, int repeatDepth)
     {
         if (string.IsNullOrWhiteSpace(block.Id) || block.Id.Length > 64 || block.Id.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
             errors.Add($"{scope} has a block whose id is missing or not a short letter, digit, '_' or '-' id.");
@@ -172,7 +172,16 @@ public static partial class ReportValidator
                     errors.Add($"{where} is nested too deeply.");
                 panel.Blocks ??= [];
                 foreach (var child in panel.Blocks)
-                    ValidateBlock(child, scope, errors, ids, parameters, columnDepth, panelDepth + 1);
+                    ValidateBlock(child, scope, errors, ids, parameters, columnDepth, panelDepth + 1, repeatDepth);
+                break;
+            case RepeatBlock repeat:
+                if (repeatDepth >= 4)
+                    errors.Add($"{where} is nested too deeply.");
+                if (!StyleRules.IsBindingPath(repeat.DataPath))
+                    errors.Add($"{where} needs a data path for its items.");
+                repeat.Blocks ??= [];
+                foreach (var child in repeat.Blocks)
+                    ValidateBlock(child, scope, errors, ids, parameters, columnDepth, panelDepth, repeatDepth + 1);
                 break;
             case ImageBlock image:
                 if (!ImageSources.IsAllowed(image.Source))
@@ -200,7 +209,7 @@ public static partial class ReportValidator
                     if (column.WidthMm is not null && column.Weight is not null)
                         errors.Add($"{where} column sets both a width and a weight.");
                     foreach (var child in column.Blocks)
-                        ValidateBlock(child, scope, errors, ids, parameters, columnDepth + 1, panelDepth);
+                        ValidateBlock(child, scope, errors, ids, parameters, columnDepth + 1, panelDepth, repeatDepth);
                 }
                 break;
             case TableBlock table:
@@ -208,7 +217,10 @@ public static partial class ReportValidator
                     errors.Add($"{where} needs a data path for its rows.");
                 if (!string.IsNullOrWhiteSpace(table.GroupBy) && !StyleRules.IsBindingPath(table.GroupBy))
                     errors.Add($"{where} group path must look like customer.name.");
+                if (!string.IsNullOrWhiteSpace(table.GroupKey) && !StyleRules.IsBindingPath(table.GroupKey))
+                    errors.Add($"{where} group key must look like customer.id.");
                 CheckParameter(table.GroupBy, where, parameters, errors);
+                CheckParameter(table.GroupKey, where, parameters, errors);
                 if (table.Columns.Count == 0)
                     errors.Add($"{where} needs at least one column.");
                 table.GroupAggregates ??= [];

@@ -1,6 +1,12 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, and 1.24. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, and 1.25. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.25
+
+- A repeat block renders its blocks for each object in an array. Repeats nest. Bindings use `item`, `parent`, and `root`. Each item can stay on one page, and a later item can start a new page.
+- A table `groupKey` keeps rows apart when they share a `groupBy` label.
+- Schema version 3 is current. Versions 1 and 2 still compile.
 
 ## 1.24
 

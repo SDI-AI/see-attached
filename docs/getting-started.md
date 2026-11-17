@@ -115,6 +115,7 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 | Field | One value, such as `invoice.billTo.name`. Same font, bold, italic, underline, color, and alignment as text. |
 | Rule | A horizontal line. Thickness and color are on the block. |
 | Panel | A group of blocks with its own padding, border, and background. |
+| Repeat | One copy of its blocks for each object in an array. Inside it, `{item.name}` is the current object, `{parent.name}` is the enclosing object, and `{root.company}` is the document. A repeat can contain another repeat. **Keep each item together** avoids splitting an item that fits on the next page. **Break before later items** starts each item after the first on a new page. |
 | Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | One to eight columns. Set `widthMm` or `weight` on a column. A column with neither shares the remaining width. The builder can add a text, field, spacer, table, or panel inside a column. A columns block may contain one more columns block, and that inner block cannot contain another. |
@@ -198,7 +199,7 @@ Two aggregates on the same column show only the first one. The aggregate label p
 { "type": "text", "id": "paid", "text": "Paid", "when": { "path": "invoice.balance", "kind": "equals", "value": "0" } }
 ```
 
-A grouped table prints one table per distinct value, in the order it first appears. The group name and the column header both sit in the table head, so a group that crosses a page repeats its title and its columns. An empty key prints `(blank)`. The report total prints on the last group. `breakBeforeGroup` starts each later group on a new page. `keepGroupTogether` keeps a group on one page when it fits.
+A grouped table prints one table per distinct value, in the order it first appears. The group name and the column header both sit in the table head, so a group that crosses a page repeats its title and its columns. An empty key prints `(blank)`. The report total prints on the last group. `breakBeforeGroup` starts each later group on a new page. `keepGroupTogether` keeps a group on one page when it fits. `groupBy` is the text in the group title. `groupKey` is optional and is the identity, so two rows can share a label and stay in different groups.
 
 Any block can set `pageBreakBefore` or `pageBreakAfter`.
 

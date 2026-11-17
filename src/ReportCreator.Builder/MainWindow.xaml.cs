@@ -611,6 +611,10 @@ public partial class MainWindow : Window
             {
                 Walk(panel.Blocks, band, depth + 1, sites);
             }
+            else if (block is RepeatBlock repeat)
+            {
+                Walk(repeat.Blocks, band, depth + 1, sites);
+            }
         }
     }
 
@@ -622,6 +626,7 @@ public partial class MainWindow : Window
         "Columns" => new ColumnsBlock { Id = NewId(), Columns = [new Column(), new Column()] },
         "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
         "Panel" => new PanelBlock { Id = NewId() },
+        "Repeat" => new RepeatBlock { Id = NewId(), DataPath = "items", KeepItemTogether = true },
         "Table" => new TableBlock
         {
             Id = NewId(),
@@ -680,6 +685,7 @@ public partial class MainWindow : Window
             ColumnsBlock columns => columns.Columns.Count + (columns.Columns.Count == 1 ? " column" : " columns"),
             RuleBlock => "Rule",
             PanelBlock panel => panel.Blocks.Count + (panel.Blocks.Count == 1 ? " block" : " blocks"),
+            RepeatBlock repeat => repeat.DataPath,
             TableBlock table => table.DataPath,
             _ => ""
         };

@@ -24,6 +24,7 @@ public static partial class ReportCompiler
         if (data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
             data = JsonSerializer.SerializeToElement(new { });
 
+        var scope = DataScope.FromRoot(data);
         var size = PaperCatalog.Resolve(definition.Page);
         var margin = definition.Page.Margin;
         var headerMm = PageMetrics.Header(definition);
@@ -53,7 +54,7 @@ public static partial class ReportCompiler
             {
                 html.Append("<thead><tr><td><div class=\"page-chrome page-header\" style=\"height:")
                     .Append(Num(headerMm)).Append("mm\">");
-                RenderBand(html, definition.PageHeader, definition, data, options);
+                RenderBand(html, definition.PageHeader, definition, scope, options);
                 html.Append("</div></td></tr></thead>");
             }
 
@@ -61,16 +62,16 @@ public static partial class ReportCompiler
             {
                 html.Append("<tfoot><tr><td><div class=\"page-chrome page-footer\" style=\"height:")
                     .Append(Num(footerMm)).Append("mm\">");
-                RenderBand(html, definition.PageFooter, definition, data, options);
+                RenderBand(html, definition.PageFooter, definition, scope, options);
                 html.Append("</div></td></tr></tfoot>");
             }
 
             html.Append("<tbody><tr><td>");
         }
 
-        RenderBand(html, definition.Header, definition, data, options);
-        RenderBand(html, definition.Body, definition, data, options);
-        RenderBand(html, definition.Footer, definition, data, options);
+        RenderBand(html, definition.Header, definition, scope, options);
+        RenderBand(html, definition.Body, definition, scope, options);
+        RenderBand(html, definition.Footer, definition, scope, options);
         if (framed)
             html.Append("</td></tr></tbody></table>");
 
@@ -81,20 +82,20 @@ public static partial class ReportCompiler
         return html.ToString();
     }
 
-    private static void RenderBand(StringBuilder html, Band band, ReportDefinition definition, JsonElement data, CompileOptions options)
+    private static void RenderBand(StringBuilder html, Band band, ReportDefinition definition, DataScope scope, CompileOptions options)
     {
         if (band.Blocks.Count == 0)
             return;
 
         html.Append("<section class=\"band\">");
         foreach (var block in band.Blocks)
-            RenderBlock(html, block, definition, data, options);
+            RenderBlock(html, block, definition, scope, options);
         html.Append("</section>");
     }
 
-    private static void RenderBlock(StringBuilder html, Block block, ReportDefinition definition, JsonElement data, CompileOptions options)
+    private static void RenderBlock(StringBuilder html, Block block, ReportDefinition definition, DataScope scope, CompileOptions options)
     {
-        if (!IsShown(block, definition, data, options))
+        if (!IsShown(block, definition, scope, options))
             return;
 
         var flags = Flags(block, options);
@@ -106,11 +107,11 @@ public static partial class ReportCompiler
                     .Append("\" data-id=\"").Append(Encode(text.Id))
                     .Append("\" style=\"").Append(TextStyle(text.FontSizePt, text.Bold, text.Italic, text.Underline, text.FontFamily, text.LineHeight, text.Color, text.Align, text.Style))
                     .Append("\">")
-                    .Append(Expand(text.Text, definition, data, options))
+                    .Append(Expand(text.Text, definition, scope, options))
                     .Append("</div>");
                 break;
             case FieldBlock field:
-                var fieldText = ResolveText(field.Path, field.Format, definition, data, options);
+                var fieldText = ResolveText(field.Path, field.Format, definition, scope, options);
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(field.Id))
@@ -134,7 +135,7 @@ public static partial class ReportCompiler
                 AppendStyleAttribute(html, BoxCss(panel.Style));
                 html.Append('>');
                 foreach (var child in panel.Blocks)
-                    RenderBlock(html, child, definition, data, options);
+                    RenderBlock(html, child, definition, scope, options);
                 html.Append("</div>");
                 break;
             case ImageBlock image:
@@ -175,13 +176,16 @@ public static partial class ReportCompiler
                 {
                     html.Append("<div class=\"col\">");
                     foreach (var child in column.Blocks)
-                        RenderBlock(html, child, definition, data, options);
+                        RenderBlock(html, child, definition, scope, options);
                     html.Append("</div>");
                 }
                 html.Append("</div>");
                 break;
+            case RepeatBlock repeat:
+                RenderRepeat(html, repeat, definition, scope, options, flags);
+                break;
             case TableBlock table:
-                RenderTable(html, table, data, options, flags);
+                RenderTable(html, table, scope, options, flags);
                 break;
         }
     }
@@ -200,13 +204,36 @@ public static partial class ReportCompiler
         return flags;
     }
 
-    private static void RenderTable(StringBuilder html, TableBlock table, JsonElement data, CompileOptions options, string flags)
+    private static void RenderRepeat(StringBuilder html, RepeatBlock repeat, ReportDefinition definition, DataScope scope, CompileOptions options, string flags)
     {
-        var rows = Rows(data, table.DataPath);
-        var groups = string.IsNullOrWhiteSpace(table.GroupBy) ? [] : Groups(rows, table.GroupBy);
+        var items = Rows(scope, repeat.DataPath);
+        html.Append("<div class=\"block repeat").Append(flags).Append("\" data-id=\"").Append(Encode(repeat.Id)).Append("\">");
+        for (var index = 0; index < items.Count; index++)
+        {
+            var itemClass = "repeat-item";
+            if (repeat.KeepItemTogether)
+                itemClass += " keep";
+            if (repeat.BreakBeforeItem && index > 0)
+                itemClass += " break-before";
+            html.Append("<div class=\"").Append(itemClass).Append("\">");
+            var itemScope = scope.ForItem(items[index]);
+            foreach (var child in repeat.Blocks)
+                RenderBlock(html, child, definition, itemScope, options);
+            html.Append("</div>");
+        }
+
+        html.Append("</div>");
+    }
+
+    private static void RenderTable(StringBuilder html, TableBlock table, DataScope scope, CompileOptions options, string flags)
+    {
+        var rows = Rows(scope, table.DataPath);
+        var identity = string.IsNullOrWhiteSpace(table.GroupKey) ? table.GroupBy : table.GroupKey;
+        var titlePath = string.IsNullOrWhiteSpace(table.GroupBy) ? table.GroupKey : table.GroupBy;
+        var groups = string.IsNullOrWhiteSpace(identity) ? [] : Groups(rows, identity, rawKey: !string.IsNullOrWhiteSpace(table.GroupKey));
         if (groups.Count == 0)
         {
-            WriteTable(html, table, rows, rows, options, "block" + flags, table.Id, groupTitle: null);
+            WriteTable(html, table, rows, rows, scope, options, "block" + flags, table.Id, groupTitle: null);
             return;
         }
 
@@ -224,10 +251,11 @@ public static partial class ReportCompiler
                 table,
                 groups[index],
                 index == groups.Count - 1 ? rows : null,
+                scope,
                 options,
                 "group",
                 id: null,
-                GroupTitle(groups[index], table.GroupBy!, options.Culture));
+                GroupTitle(groups[index], titlePath!, options.Culture));
             html.Append("</div>");
         }
 
@@ -239,6 +267,7 @@ public static partial class ReportCompiler
         TableBlock table,
         List<JsonElement> rows,
         List<JsonElement>? reportRows,
+        DataScope scope,
         CompileOptions options,
         string className,
         string? id,
@@ -304,13 +333,13 @@ public static partial class ReportCompiler
                 string cell;
                 if (column.RunningTotal)
                 {
-                    if (DataValues.TryResolve(row, column.Path, out var amount) && DataValues.AsDecimal(amount) is decimal number)
+                    if (TryCell(scope, row, column.Path, out var amount) && DataValues.AsDecimal(amount) is decimal number)
                         running[index] += number;
                     cell = DataValues.Format(JsonSerializer.SerializeToElement(running[index]), column.Format, options.Culture);
                 }
                 else
                 {
-                    cell = DataValues.TryResolve(row, column.Path, out var value)
+                    cell = TryCell(scope, row, column.Path, out var value)
                         ? DataValues.Format(value, column.Format, options.Culture)
                         : "";
                 }
@@ -345,10 +374,17 @@ public static partial class ReportCompiler
         return key.Length == 0 ? "(blank)" : key;
     }
 
-    private static List<JsonElement> Rows(JsonElement data, string path)
+    private static bool TryCell(DataScope scope, JsonElement row, string path, out JsonElement value)
+    {
+        if (scope.Item is not null && DataScope.TryScopePrefix(path, out _, out _))
+            return scope.TryGet(path, out value);
+        return DataValues.TryResolve(row, path, out value);
+    }
+
+    private static List<JsonElement> Rows(DataScope scope, string path)
     {
         var rows = new List<JsonElement>();
-        if (!DataValues.TryResolve(data, path, out var array) || array.ValueKind != JsonValueKind.Array)
+        if (!scope.TryGet(path, out var array) || array.ValueKind != JsonValueKind.Array)
             return rows;
 
         foreach (var row in array.EnumerateArray())
@@ -360,7 +396,7 @@ public static partial class ReportCompiler
         return rows;
     }
 
-    private static List<List<JsonElement>> Groups(List<JsonElement> rows, string? groupBy)
+    private static List<List<JsonElement>> Groups(List<JsonElement> rows, string? groupBy, bool rawKey)
     {
         if (string.IsNullOrWhiteSpace(groupBy))
             return rows.Count == 0 ? [] : [rows];
@@ -370,7 +406,7 @@ public static partial class ReportCompiler
         foreach (var row in rows)
         {
             var key = DataValues.TryResolve(row, groupBy, out var value)
-                ? DataValues.Format(value, null, CultureInfo.InvariantCulture)
+                ? rawKey ? RawKey(value) : DataValues.Format(value, null, CultureInfo.InvariantCulture)
                 : "";
             if (!index.TryGetValue(key, out var at))
             {
@@ -384,6 +420,16 @@ public static partial class ReportCompiler
 
         return groups;
     }
+
+    private static string RawKey(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => "s:" + (value.GetString() ?? ""),
+        JsonValueKind.Number => "n:" + value.GetRawText(),
+        JsonValueKind.True => "b:true",
+        JsonValueKind.False => "b:false",
+        JsonValueKind.Null or JsonValueKind.Undefined => "",
+        _ => "j:" + value.GetRawText()
+    };
 
     private static void AppendAggregateRow(
         StringBuilder html,
@@ -413,12 +459,12 @@ public static partial class ReportCompiler
         html.Append("</tr>");
     }
 
-    private static bool IsShown(Block block, ReportDefinition definition, JsonElement data, CompileOptions options)
+    private static bool IsShown(Block block, ReportDefinition definition, DataScope scope, CompileOptions options)
     {
         if (block.When is null || string.IsNullOrWhiteSpace(block.When.Path))
             return true;
 
-        var found = TryResolveValue(block.When.Path, definition, data, options, out var value);
+        var found = TryResolveValue(block.When.Path, definition, scope, options, out var value);
         var empty = !found || IsEmpty(value);
         return block.When.Kind switch
         {
@@ -477,7 +523,7 @@ public static partial class ReportCompiler
         return DataValues.Format(JsonSerializer.SerializeToElement(result), aggregate.Format, culture);
     }
 
-    private static string Expand(string? text, ReportDefinition definition, JsonElement data, CompileOptions options)
+    private static string Expand(string? text, ReportDefinition definition, DataScope scope, CompileOptions options)
     {
         if (string.IsNullOrEmpty(text))
             return "";
@@ -489,7 +535,7 @@ public static partial class ReportCompiler
             html.Append(Encode(text[index..match.Index]));
             var path = match.Groups[1].Value;
             var format = match.Groups[2].Success ? match.Groups[2].Value : null;
-            html.Append(Encode(ResolveText(path, format, definition, data, options)));
+            html.Append(Encode(ResolveText(path, format, definition, scope, options)));
             index = match.Index + match.Length;
         }
 
@@ -497,18 +543,18 @@ public static partial class ReportCompiler
         return html.ToString();
     }
 
-    private static string ResolveText(string path, string? format, ReportDefinition definition, JsonElement data, CompileOptions options)
+    private static string ResolveText(string path, string? format, ReportDefinition definition, DataScope scope, CompileOptions options)
     {
         if (path == PrintPaths.ReportName)
             return definition.Name;
         if (path is PrintPaths.Date or PrintPaths.Time)
             return FormatClock(options, format, path == PrintPaths.Date);
-        if (!TryResolveValue(path, definition, data, options, out var value))
+        if (!TryResolveValue(path, definition, scope, options, out var value))
             return "";
         return DataValues.Format(value, format, options.Culture);
     }
 
-    private static bool TryResolveValue(string path, ReportDefinition definition, JsonElement data, CompileOptions options, out JsonElement value)
+    private static bool TryResolveValue(string path, ReportDefinition definition, DataScope scope, CompileOptions options, out JsonElement value)
     {
         if (PrintPaths.IsPrintField(path))
         {
@@ -519,7 +565,7 @@ public static partial class ReportCompiler
         if (PrintPaths.TryParameterName(path, out var name))
             return ParameterValues.TryGet(definition, options.Parameters, name, out value);
 
-        return DataValues.TryResolve(data, path, out value);
+        return scope.TryGet(path, out value);
     }
 
     private static JsonElement PrintElement(string path, ReportDefinition definition, CompileOptions options)
@@ -581,6 +627,8 @@ public static partial class ReportCompiler
         table.layout-fixed { table-layout: fixed; }
         .break-before { break-before: page; page-break-before: always; }
         .break-after { break-after: page; page-break-after: always; }
+        .repeat-item { margin: 0 0 4mm; }
+        .repeat-item:last-child { margin-bottom: 0; }
         .group-wrap { margin: 0 0 4mm; }
         .group-wrap:last-child { margin-bottom: 0; }
         tr.group-head { break-after: avoid; }

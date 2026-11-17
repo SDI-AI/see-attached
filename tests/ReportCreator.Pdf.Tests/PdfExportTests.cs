@@ -266,6 +266,61 @@ public partial class PdfExportTests
     }
 
     [Fact]
+    public async Task Export_KeepsARepeatedCardTogetherWhenItFitsOnTheNextPage()
+    {
+        var filler = new List<Block>();
+        for (var index = 1; index <= 30; index++)
+            filler.Add(new TextBlock { Id = "pad" + index.ToString(CultureInfo.InvariantCulture), Text = "PAD-" + index.ToString("00", CultureInfo.InvariantCulture) });
+
+        var card = new List<Block> { new TextBlock { Id = "start", Text = "CARD-START" } };
+        for (var index = 1; index <= 8; index++)
+            card.Add(new TextBlock { Id = "card" + index.ToString(CultureInfo.InvariantCulture), Text = "CARD-LINE-" + index.ToString(CultureInfo.InvariantCulture) });
+        card.Add(new TextBlock { Id = "end", Text = "CARD-END" });
+
+        var definition = new ReportDefinition
+        {
+            Name = "Cards",
+            Page = new PageSetup
+            {
+                Margin = new Margin { Top = 12, Right = 12, Bottom = 12, Left = 12 },
+                PageHeaderMm = 12,
+                PageFooterMm = 10,
+                PageNumbers = PageNumberPlacement.BottomCenter
+            },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "HEADER-MARK" }] },
+            PageFooter = { Blocks = [new TextBlock { Id = "copy", Text = "FOOTER-MARK" }] },
+            Body =
+            {
+                Blocks =
+                [
+                    .. filler,
+                    new RepeatBlock
+                    {
+                        Id = "cards",
+                        DataPath = "cards",
+                        KeepItemTogether = true,
+                        Blocks = card
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { cards = new[] { new { id = "C-1" } } });
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.InvariantCulture
+        });
+
+        var pages = ExtractPlacedLines(await exporter.ExportAsync(definition, data, TestContext.Current.CancellationToken));
+        Assert.True(pages.Count >= 2, "Expected the card to move onto a later page, got " + pages.Count + ".");
+        var startPage = pages.FindIndex(page => page.Any(line => line.Text.Contains("CARD-START", StringComparison.Ordinal)));
+        var endPage = pages.FindIndex(page => page.Any(line => line.Text.Contains("CARD-END", StringComparison.Ordinal)));
+        Assert.Equal(startPage, endPage);
+        Assert.True(startPage > 0, "The card should move to the next page instead of splitting under the filler.");
+        Assert.Contains(pages[0], line => line.Text.Contains("PAD-01", StringComparison.Ordinal));
+        Assert.DoesNotContain(pages[0], line => line.Text.Contains("CARD-START", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Export_PlacesFourColumnsByMillimetreAndLeavesTheRemainder()
     {
         var definition = new ReportDefinition

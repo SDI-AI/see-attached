@@ -38,7 +38,7 @@ public static partial class ReportBindings
             if (band.Blocks is null)
                 continue;
             foreach (var block in band.Blocks)
-                Walk(block, Add);
+                Walk(block, Add, itemPath: null, parentPath: null);
         }
 
         return found;
@@ -59,7 +59,8 @@ public static partial class ReportBindings
                     break;
                 case ReportBindingKind.Column:
                 case ReportBindingKind.Group:
-                    root.RowValue(binding.TablePath!, binding.Path, SampleValue(binding.Format));
+                    root.Array(binding.TablePath!);
+                    root.Value(binding.TablePath + "." + binding.Path, SampleValue(binding.Kind == ReportBindingKind.Group ? null : binding.Format));
                     break;
                 default:
                     root.Value(binding.Path, SampleValue(binding.Format));
@@ -79,13 +80,13 @@ public static partial class ReportBindings
             if (PrintPaths.IsPrintField(binding.Path) || PrintPaths.TryParameterName(binding.Path, out _))
                 continue;
 
-            var type = TypeFor(binding.Format);
+            var type = binding.Kind == ReportBindingKind.Group ? DataFieldType.String : TypeFor(binding.Format);
             if (binding.Kind == ReportBindingKind.Table)
-                DataEdit.Ensure(document, binding.Path, DataFieldType.Array);
+                EnsureChain(document, binding.Path, DataFieldType.Array);
             else if (binding.Kind is ReportBindingKind.Column or ReportBindingKind.Group)
-                DataEdit.EnsureColumn(document, binding.TablePath ?? "", binding.Path, binding.Kind == ReportBindingKind.Group ? DataFieldType.String : type);
+                EnsureChain(document, binding.TablePath + "." + binding.Path, type);
             else
-                DataEdit.Ensure(document, binding.Path, type);
+                EnsureChain(document, binding.Path, type);
         }
 
         document.Values = MergeMissing(document.Values, Sample(definition));
@@ -119,38 +120,136 @@ public static partial class ReportBindings
         return JsonSerializer.SerializeToElement(target);
     }
 
-    private static void Walk(Block block, Action<ReportBinding> add)
+    private static void Walk(Block block, Action<ReportBinding> add, string? itemPath, string? parentPath)
     {
         if (block.When is { Path.Length: > 0 })
-            add(new ReportBinding(block.When.Path, ReportBindingKind.Condition));
+            AddScoped(add, block.When.Path, ReportBindingKind.Condition, null, itemPath, parentPath);
 
         switch (block)
         {
             case TextBlock text:
                 foreach (Match match in Token().Matches(text.Text))
-                    add(new ReportBinding(match.Groups[1].Value, ReportBindingKind.Value, match.Groups[2].Success ? match.Groups[2].Value : null));
+                    AddScoped(add, match.Groups[1].Value, ReportBindingKind.Value, match.Groups[2].Success ? match.Groups[2].Value : null, itemPath, parentPath);
                 break;
             case FieldBlock field when field.Path.Length > 0:
-                add(new ReportBinding(field.Path, ReportBindingKind.Value, field.Format));
+                AddScoped(add, field.Path, ReportBindingKind.Value, field.Format, itemPath, parentPath);
                 break;
             case ColumnsBlock columns:
                 foreach (var column in columns.Columns)
                 {
                     foreach (var child in column.Blocks)
-                        Walk(child, add);
+                        Walk(child, add, itemPath, parentPath);
                 }
                 break;
             case PanelBlock panel:
                 foreach (var child in panel.Blocks ?? [])
-                    Walk(child, add);
+                    Walk(child, add, itemPath, parentPath);
+                break;
+            case RepeatBlock repeat when repeat.DataPath.Length > 0:
+                var repeatPath = Absolute(repeat.DataPath, itemPath, parentPath);
+                add(new ReportBinding(repeatPath, ReportBindingKind.Table));
+                foreach (var child in repeat.Blocks ?? [])
+                    Walk(child, add, repeatPath, itemPath);
                 break;
             case TableBlock table when table.DataPath.Length > 0:
-                add(new ReportBinding(table.DataPath, ReportBindingKind.Table));
+                var tablePath = Absolute(table.DataPath, itemPath, parentPath);
+                add(new ReportBinding(tablePath, ReportBindingKind.Table));
                 foreach (var column in table.Columns)
-                    add(new ReportBinding(column.Path, ReportBindingKind.Column, column.Format, table.DataPath));
+                {
+                    if (itemPath is not null && DataScope.TryScopePrefix(column.Path, out _, out _))
+                        AddScoped(add, column.Path, ReportBindingKind.Column, column.Format, itemPath, parentPath);
+                    else
+                        add(new ReportBinding(column.Path, ReportBindingKind.Column, column.Format, tablePath));
+                }
                 if (!string.IsNullOrWhiteSpace(table.GroupBy))
-                    add(new ReportBinding(table.GroupBy, ReportBindingKind.Group, null, table.DataPath));
+                    add(new ReportBinding(table.GroupBy, ReportBindingKind.Group, null, tablePath));
+                if (!string.IsNullOrWhiteSpace(table.GroupKey))
+                    add(new ReportBinding(table.GroupKey, ReportBindingKind.Group, null, tablePath));
                 break;
+        }
+    }
+
+    private static void AddScoped(Action<ReportBinding> add, string path, ReportBindingKind kind, string? format, string? itemPath, string? parentPath)
+    {
+        if (itemPath is not null && DataScope.TryScopePrefix(path, out var head, out var rest) && rest is not null)
+        {
+            if (head == "item")
+            {
+                add(new ReportBinding(rest, kind is ReportBindingKind.Value or ReportBindingKind.Condition ? ReportBindingKind.Column : kind, format, itemPath));
+                return;
+            }
+
+            if (head == "parent" && parentPath is not null)
+            {
+                add(new ReportBinding(rest, ReportBindingKind.Column, format, parentPath));
+                return;
+            }
+
+            if (head == "root")
+            {
+                add(new ReportBinding(rest, ReportBindingKind.Value, format));
+                return;
+            }
+        }
+
+        if (itemPath is not null && kind == ReportBindingKind.Column)
+        {
+            add(new ReportBinding(path, ReportBindingKind.Column, format, itemPath));
+            return;
+        }
+
+        add(new ReportBinding(Absolute(path, itemPath, parentPath), kind, format));
+    }
+
+    private static string Absolute(string path, string? itemPath, string? parentPath)
+    {
+        if (itemPath is null || !DataScope.TryScopePrefix(path, out var head, out var rest))
+            return path;
+        if (head == "root")
+            return rest ?? path;
+        if (head == "item")
+            return Join(itemPath, rest);
+        if (head == "parent")
+            return parentPath is null ? rest ?? path : Join(parentPath, rest);
+        return path;
+    }
+
+    private static string Join(string left, string? right) =>
+        string.IsNullOrEmpty(right) ? left : left + "." + right;
+
+    private static void EnsureChain(DataDocument document, string? path, DataFieldType leaf)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var parts = path.Split('.');
+        if (parts.Any(part => !ParameterRules.IsName(part)))
+            return;
+
+        document.Fields ??= [];
+        var fields = document.Fields;
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var name = parts[index];
+            var last = index == parts.Length - 1;
+            var field = fields.FirstOrDefault(item => item.Name == name);
+            if (field is null)
+            {
+                field = new DataField
+                {
+                    Name = name,
+                    Type = last ? leaf : DataFieldType.Object
+                };
+                if (field.Type is DataFieldType.Object or DataFieldType.Array)
+                    field.Fields = [];
+                fields.Add(field);
+            }
+
+            if (!last && field.Type is DataFieldType.Object or DataFieldType.Array)
+            {
+                field.Fields ??= [];
+                fields = field.Fields;
+            }
         }
     }
 
@@ -220,47 +319,36 @@ public static partial class ReportBindings
     {
         private readonly Dictionary<string, object?> _values = [];
 
-        public void Value(string path, object? value) => Set(_values, path.Split('.'), value);
+        public void Value(string path, object? value) => Place(_values, path.Split('.'), value, array: false);
 
-        public void Array(string path)
-        {
-            var parts = path.Split('.');
-            var parent = Ensure(_values, parts[..^1]);
-            if (!parent.ContainsKey(parts[^1]))
-                parent[parts[^1]] = new List<Dictionary<string, object?>> { new Dictionary<string, object?>() };
-        }
+        public void Array(string path) => Place(_values, path.Split('.'), new List<Dictionary<string, object?>> { new Dictionary<string, object?>() }, array: true);
 
-        public void RowValue(string tablePath, string columnPath, object? value)
+        private static void Place(Dictionary<string, object?> node, string[] parts, object? value, bool array)
         {
-            Array(tablePath);
-            var parts = tablePath.Split('.');
-            var parent = Ensure(_values, parts[..^1]);
-            var rows = (List<Dictionary<string, object?>>)parent[parts[^1]]!;
-            Set(rows[0], columnPath.Split('.'), value);
+            if (parts.Length == 1)
+            {
+                if (!node.ContainsKey(parts[0]))
+                    node[parts[0]] = value;
+                return;
+            }
+
+            if (node.TryGetValue(parts[0], out var existing) && existing is List<Dictionary<string, object?>> rows)
+            {
+                if (rows.Count == 0)
+                    rows.Add(new Dictionary<string, object?>());
+                Place(rows[0], parts[1..], value, array);
+                return;
+            }
+
+            if (node.GetValueOrDefault(parts[0]) is not Dictionary<string, object?> child)
+            {
+                child = [];
+                node[parts[0]] = child;
+            }
+
+            Place(child, parts[1..], value, array);
         }
 
         public JsonElement ToElement() => JsonSerializer.SerializeToElement(_values);
-
-        private static Dictionary<string, object?> Ensure(Dictionary<string, object?> node, string[] parts)
-        {
-            foreach (var part in parts)
-            {
-                if (!node.TryGetValue(part, out var next) || next is not Dictionary<string, object?> child)
-                {
-                    child = [];
-                    node[part] = child;
-                }
-
-                node = child;
-            }
-
-            return node;
-        }
-
-        private static void Set(Dictionary<string, object?> node, string[] parts, object? value)
-        {
-            var parent = Ensure(node, parts[..^1]);
-            parent[parts[^1]] = value;
-        }
     }
 }

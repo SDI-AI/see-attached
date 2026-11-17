@@ -601,6 +601,73 @@ public class ReportTests
     }
 
     [Fact]
+    public void Repeat_KeepsDistinctChildrenAndIndependentLists()
+    {
+        var definition = OrdersReport();
+        var data = OrdersData();
+        var html = ReportCompiler.Compile(definition, data, new CompileOptions { Culture = CultureInfo.InvariantCulture });
+        var again = ReportJson.Read(ReportJson.Write(definition));
+
+        Assert.Equal(6, Count(html, "repeat-item keep"));
+        Assert.Contains(">SO-1<", html, StringComparison.Ordinal);
+        Assert.Contains(">SO-2<", html, StringComparison.Ordinal);
+        Assert.Equal(1, Count(html, ">SO-1<"));
+        Assert.Equal(1, Count(html, ">SO-2<"));
+        Assert.Contains(">L-1 Same name<", html, StringComparison.Ordinal);
+        Assert.Contains(">L-2 Same name<", html, StringComparison.Ordinal);
+        Assert.Contains(">L-3 Same name<", html, StringComparison.Ordinal);
+        Assert.Contains(">L-4 Same name<", html, StringComparison.Ordinal);
+        Assert.Equal(4, Count(html, "Same name"));
+        Assert.Contains("Northwind", html, StringComparison.Ordinal);
+        Assert.Equal(2, Count(html, ">Northwind<"));
+
+        var first = Slice(html, ">L-1 Same name<", ">L-2 Same name<");
+        Assert.Contains(">n1<", first, StringComparison.Ordinal);
+        Assert.Contains(">n2<", first, StringComparison.Ordinal);
+        Assert.DoesNotContain(">n3<", first, StringComparison.Ordinal);
+        Assert.Contains(">A<", first, StringComparison.Ordinal);
+        Assert.DoesNotContain(">B<", first, StringComparison.Ordinal);
+        Assert.Contains(">c1<", first, StringComparison.Ordinal);
+        Assert.Contains(">c2<", first, StringComparison.Ordinal);
+        Assert.Contains(">c3<", first, StringComparison.Ordinal);
+        Assert.DoesNotContain(">c4<", first, StringComparison.Ordinal);
+        Assert.Contains(">Ada<", first, StringComparison.Ordinal);
+        Assert.Equal(16, Count(html, "<table class=\"block"));
+        Assert.Contains("break-before", html, StringComparison.Ordinal);
+        Assert.Equal(html, ReportCompiler.Compile(again, data, new CompileOptions { Culture = CultureInfo.InvariantCulture }));
+
+        var keyed = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "grouped",
+                        DataPath = "lines",
+                        GroupBy = "label",
+                        GroupKey = "id",
+                        ShowHeader = false,
+                        Columns = [new TableColumn { Header = "Label", Path = "label" }, new TableColumn { Header = "Qty", Path = "qty" }]
+                    }
+                ]
+            }
+        };
+        var keyedHtml = ReportCompiler.Compile(keyed, JsonSerializer.SerializeToElement(new
+        {
+            lines = new[]
+            {
+                new { id = "A-1", label = "Same name", qty = 1 },
+                new { id = "A-2", label = "Same name", qty = 4 }
+            }
+        }), new CompileOptions { Culture = CultureInfo.InvariantCulture });
+        Assert.Equal(2, Count(keyedHtml, "<th colspan=\"2\">Same name</th>"));
+        Assert.Contains(">1<", keyedHtml, StringComparison.Ordinal);
+        Assert.Contains(">4<", keyedHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Columns_UseWidthsWeightsAndIndependentLists()
     {
         var definition = new ReportDefinition
@@ -857,6 +924,129 @@ public class ReportTests
         Assert.Equal("INV-1001", merged.GetProperty("invoice").GetProperty("number").GetString());
         Assert.Equal(2, merged.GetProperty("lines").GetArrayLength());
     }
+
+    private static int Count(string text, string token) => text.Split(token).Length - 1;
+
+    private static string Slice(string text, string start, string end)
+    {
+        var from = text.IndexOf(start, StringComparison.Ordinal);
+        var to = text.IndexOf(end, from + start.Length, StringComparison.Ordinal);
+        return text[from..to];
+    }
+
+    private static ReportDefinition OrdersReport() => new()
+    {
+        Name = "Orders",
+        Body =
+        {
+            Blocks =
+            [
+                new RepeatBlock
+                {
+                    Id = "orders",
+                    DataPath = "orders",
+                    KeepItemTogether = true,
+                    Blocks =
+                    [
+                        new TextBlock { Id = "order", Text = "{item.id}" },
+                        new TextBlock { Id = "company", Text = "{root.company}" },
+                        new RepeatBlock
+                        {
+                            Id = "lines",
+                            DataPath = "item.lines",
+                            KeepItemTogether = true,
+                            BreakBeforeItem = true,
+                            Blocks =
+                            [
+                                new TextBlock { Id = "line", Text = "{item.id} {item.title}" },
+                                new TextBlock { Id = "buyer", Text = "{parent.customer}" },
+                                new ColumnsBlock
+                                {
+                                    Id = "lists",
+                                    GapMm = 4,
+                                    Columns =
+                                    [
+                                        new Column { WidthMm = 40, Blocks = [Table("notes", "item.notes", "text")] },
+                                        new Column { WidthMm = 30, Blocks = [Table("parts", "item.parts", "sku")] },
+                                        new Column { WidthMm = 30, Blocks = [Table("tasks", "item.tasks", "name")] },
+                                        new Column { Blocks = [Table("charges", "item.charges", "name")] }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    };
+
+    private static TableBlock Table(string id, string path, string column) => new()
+    {
+        Id = id,
+        DataPath = path,
+        ShowHeader = false,
+        Columns = [new TableColumn { Header = column, Path = column }]
+    };
+
+    private static JsonElement OrdersData() => JsonSerializer.SerializeToElement(new
+    {
+        company = "Northwind",
+        orders = new object[]
+        {
+            new
+            {
+                id = "SO-1",
+                customer = "Ada",
+                lines = new object[]
+                {
+                    new
+                    {
+                        id = "L-1",
+                        title = "Same name",
+                        notes = new[] { new { text = "n1" }, new { text = "n2" } },
+                        parts = new[] { new { sku = "A" } },
+                        tasks = Array.Empty<object>(),
+                        charges = new[] { new { name = "c1" }, new { name = "c2" }, new { name = "c3" } }
+                    },
+                    new
+                    {
+                        id = "L-2",
+                        title = "Same name",
+                        notes = new[] { new { text = "n3" } },
+                        parts = new[] { new { sku = "B" }, new { sku = "C" } },
+                        tasks = new[] { new { name = "t1" }, new { name = "t2" } },
+                        charges = new[] { new { name = "c4" } }
+                    }
+                }
+            },
+            new
+            {
+                id = "SO-2",
+                customer = "Bea",
+                lines = new object[]
+                {
+                    new
+                    {
+                        id = "L-3",
+                        title = "Same name",
+                        notes = new[] { new { text = "n4" } },
+                        parts = new[] { new { sku = "D" } },
+                        tasks = new[] { new { name = "t3" } },
+                        charges = new[] { new { name = "c5" } }
+                    },
+                    new
+                    {
+                        id = "L-4",
+                        title = "Same name",
+                        notes = new[] { new { text = "n5" }, new { text = "n6" } },
+                        parts = Array.Empty<object>(),
+                        tasks = new[] { new { name = "t4" } },
+                        charges = new[] { new { name = "c6" }, new { name = "c7" } }
+                    }
+                }
+            }
+        }
+    });
 
     private static string CompileInvoice() =>
         ReportCompiler.Compile(ReadInvoice(), ReadInvoiceData(), new CompileOptions { Culture = Us });

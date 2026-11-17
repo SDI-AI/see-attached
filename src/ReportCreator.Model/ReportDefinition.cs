@@ -4,7 +4,7 @@ namespace ReportCreator.Model;
 
 public sealed class ReportDefinition
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public const int MinimumSchemaVersion = 1;
 
