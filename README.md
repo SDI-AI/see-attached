@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.21. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.22. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,11 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.22 adds
+
+- The repeating page header and page footer take their height in the table flow. The body stops above the footer on every page, and the page number stays in the bottom margin.
+- Table column widths are written on a `colgroup`. They still apply when the header row is hidden, and when a group title spans every column.
 
 ## What 1.21 adds
 

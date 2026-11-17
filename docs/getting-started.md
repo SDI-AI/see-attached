@@ -55,7 +55,7 @@ The window has the block list on the left, the PDF preview in the middle, and th
 7. Choose **File → Save as**. A `.json` file is the definition. A `.rcreport` file is a zip that contains `definition.json`.
 8. Choose **File → Export HTML** or **File → Export PDF**.
 
-Header, body, and footer each print once. Page header and page footer repeat on every page. Put the letterhead in the page header and a one-time title in the report header.
+Header, body, and footer each print once. Page header and page footer repeat on every page as table groups, so a full page keeps the body above the footer and below the header. Page numbers stay in the bottom margin. Put the letterhead in the page header and a one-time title in the report header.
 
 ## Parameters and print fields
 
@@ -116,7 +116,7 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 | Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | Two or three equal columns. The builder adds text, field, and spacer inside a column. A columns block cannot contain another columns block. |
-| Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |
+| Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. A column `widthMm` is written on a `colgroup`, so the width holds when the header is hidden and when a group title spans the table. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |
 
 A text block mixes words and values:
 

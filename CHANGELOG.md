@@ -1,6 +1,11 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, and 1.21. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, and 1.22. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.22
+
+- The repeating page header and page footer are table groups. They keep their band clear of the body on every page, including the first. Page numbers stay in the bottom margin.
+- A table writes a `colgroup`, so column widths apply when the header is hidden and when a group title spans the row.
 
 ## 1.21
 
