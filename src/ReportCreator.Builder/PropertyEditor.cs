@@ -133,21 +133,60 @@ internal static class PropertyEditor
     private static void AddColumnTools(StackPanel panel, ColumnsBlock columns, Action preview, Action rebuild)
     {
         AddLabel(panel, $"{columns.Columns.Count} columns");
-        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Spacer" }, SelectedIndex = 0 };
+        AddOptionalMm(panel, "Gap mm", columns.GapMm, value => columns.GapMm = value, preview);
+        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Spacer", "Table", "Panel" }, SelectedIndex = 0 };
         Use(kind, "FieldCombo");
         panel.Children.Add(kind);
         for (var index = 0; index < columns.Columns.Count; index++)
         {
+            var column = columns.Columns[index];
             var columnIndex = index;
+            AddOptionalMm(panel, $"Column {index + 1} width mm", column.WidthMm, value =>
+            {
+                column.WidthMm = value;
+                if (value is not null)
+                    column.Weight = null;
+                preview();
+            }, preview);
+            AddOptionalMm(panel, $"Column {index + 1} weight", column.Weight, value =>
+            {
+                column.Weight = value;
+                if (value is not null)
+                    column.WidthMm = null;
+                preview();
+            }, preview);
             var button = Quiet($"Add to column {index + 1}");
             button.Click += (_, _) =>
             {
-                var child = NewBlock(kind.SelectedItem as string ?? "Text");
-                columns.Columns[columnIndex].Blocks.Add(child);
+                columns.Columns[columnIndex].Blocks.Add(NewBlock(kind.SelectedItem as string ?? "Text"));
                 rebuild();
                 preview();
             };
             panel.Children.Add(button);
+        }
+
+        if (columns.Columns.Count < 8)
+        {
+            var add = Quiet("Add column");
+            add.Click += (_, _) =>
+            {
+                columns.Columns.Add(new Column());
+                rebuild();
+                preview();
+            };
+            panel.Children.Add(add);
+        }
+
+        if (columns.Columns.Count > 1)
+        {
+            var remove = Quiet("Remove last column");
+            remove.Click += (_, _) =>
+            {
+                columns.Columns.RemoveAt(columns.Columns.Count - 1);
+                rebuild();
+                preview();
+            };
+            panel.Children.Add(remove);
         }
     }
 
@@ -648,6 +687,7 @@ internal static class PropertyEditor
         "Field" => new FieldBlock { Id = NewId(), Path = "name" },
         "Image" => new ImageBlock { Id = NewId(), Source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", Alt = "" },
         "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
+        "Panel" => new PanelBlock { Id = NewId() },
         "Table" => new TableBlock
         {
             Id = NewId(),

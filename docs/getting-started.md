@@ -117,7 +117,7 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 | Panel | A group of blocks with its own padding, border, and background. |
 | Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
 | Spacer | Empty vertical room, in millimetres. |
-| Columns | Two or three equal columns. The builder adds text, field, and spacer inside a column. A columns block cannot contain another columns block. |
+| Columns | One to eight columns. Set `widthMm` or `weight` on a column. A column with neither shares the remaining width. The builder can add a text, field, spacer, table, or panel inside a column. A columns block may contain one more columns block, and that inner block cannot contain another. |
 | Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. A column `widthMm` is written on a `colgroup`, so the width holds when the header is hidden and when a group title spans the table. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |
 
 A text block mixes words and values:

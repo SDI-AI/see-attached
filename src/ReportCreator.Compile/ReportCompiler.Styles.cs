@@ -134,6 +134,29 @@ public static partial class ReportCompiler
         return css.ToString();
     }
 
+    private static string ColumnGrid(ColumnsBlock columns)
+    {
+        var css = new StringBuilder();
+        css.Append("grid-template-columns:");
+        for (var index = 0; index < columns.Columns.Count; index++)
+        {
+            if (index > 0)
+                css.Append(' ');
+            var column = columns.Columns[index];
+            if (column.WidthMm is decimal width)
+                css.Append(Num(width)).Append("mm");
+            else if (column.Weight is decimal weight)
+                css.Append(Num(weight)).Append("fr");
+            else
+                css.Append("minmax(0,1fr)");
+        }
+
+        css.Append(";align-items:start;");
+        if (columns.GapMm is decimal gap)
+            css.Append("gap:").Append(Num(gap)).Append("mm;");
+        return css.ToString();
+    }
+
     private static void AppendStyleAttribute(StringBuilder html, string css)
     {
         if (css.Length == 0)
