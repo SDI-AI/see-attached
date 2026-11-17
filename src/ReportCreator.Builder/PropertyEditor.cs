@@ -60,6 +60,20 @@ internal static class PropertyEditor
             case PanelBlock container:
                 AddPanelTools(panel, container, preview, rebuild);
                 break;
+            case RepeatBlock repeat:
+                AddText(panel, "Data path", repeat.DataPath, value => repeat.DataPath = value, preview, multiline: false);
+                AddCheck(panel, "Keep each item together", repeat.KeepItemTogether, value =>
+                {
+                    repeat.KeepItemTogether = value;
+                    preview();
+                });
+                AddCheck(panel, "Break before later items", repeat.BreakBeforeItem, value =>
+                {
+                    repeat.BreakBeforeItem = value;
+                    preview();
+                });
+                AddRepeatTools(panel, repeat, preview, rebuild);
+                break;
             case ImageBlock image:
                 AddText(panel, "Source", image.Source, value => image.Source = value, preview, multiline: true);
                 AddText(panel, "Alt", image.Alt, value => image.Alt = value, preview, multiline: false);
@@ -112,8 +126,24 @@ internal static class PropertyEditor
         TableBlock => "Table",
         RuleBlock => "Rule",
         PanelBlock => "Panel",
+        RepeatBlock => "Repeat",
         _ => "Block"
     };
+
+    private static void AddRepeatTools(StackPanel panel, RepeatBlock repeat, Action preview, Action rebuild)
+    {
+        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Table", "Columns", "Panel", "Repeat" }, SelectedIndex = 0 };
+        Use(kind, "FieldCombo");
+        panel.Children.Add(kind);
+        var button = Quiet("Add inside repeat");
+        button.Click += (_, _) =>
+        {
+            repeat.Blocks.Add(NewBlock(kind.SelectedItem as string ?? "Text"));
+            rebuild();
+            preview();
+        };
+        panel.Children.Add(button);
+    }
 
     private static void AddPanelTools(StackPanel panel, PanelBlock container, Action preview, Action rebuild)
     {
@@ -688,6 +718,8 @@ internal static class PropertyEditor
         "Image" => new ImageBlock { Id = NewId(), Source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", Alt = "" },
         "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
         "Panel" => new PanelBlock { Id = NewId() },
+        "Columns" => new ColumnsBlock { Id = NewId(), Columns = [new Column(), new Column()] },
+        "Repeat" => new RepeatBlock { Id = NewId(), DataPath = "items", KeepItemTogether = true },
         "Table" => new TableBlock
         {
             Id = NewId(),

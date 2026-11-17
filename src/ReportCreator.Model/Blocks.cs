@@ -25,6 +25,7 @@ public enum AggregateKind
 [JsonDerivedType(typeof(TableBlock), "table")]
 [JsonDerivedType(typeof(RuleBlock), "rule")]
 [JsonDerivedType(typeof(PanelBlock), "panel")]
+[JsonDerivedType(typeof(RepeatBlock), "repeat")]
 public abstract class Block
 {
     public string Id { get; set; } = "";
@@ -100,6 +101,17 @@ public sealed class PanelBlock : Block
     public List<Block> Blocks { get; set; } = [];
 }
 
+public sealed class RepeatBlock : Block
+{
+    public string DataPath { get; set; } = "";
+
+    public List<Block> Blocks { get; set; } = [];
+
+    public bool BreakBeforeItem { get; set; }
+
+    public bool KeepItemTogether { get; set; } = true;
+}
+
 public sealed class ImageBlock : Block
 {
     public string Source { get; set; } = "";
@@ -165,6 +177,8 @@ public sealed class TableBlock : Block
     public bool ShowHeader { get; set; } = true;
 
     public string? GroupBy { get; set; }
+
+    public string? GroupKey { get; set; }
 
     public bool BreakBeforeGroup { get; set; }
 

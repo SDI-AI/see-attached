@@ -72,6 +72,7 @@
                             <ComboBoxItem Content="Table" />
                             <ComboBoxItem Content="Rule" />
                             <ComboBoxItem Content="Panel" />
+                            <ComboBoxItem Content="Repeat" />
                         </ComboBox>
                         <Button Grid.Column="1" Content="Add" Style="{StaticResource InkButton}" VerticalAlignment="Top" Click="Add_Click" />
                     </Grid>
@@ -81,7 +82,7 @@
                         <Button Content="Delete" Style="{StaticResource QuietButton}" Margin="4,0,0,0" Click="Delete_Click" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource Eyebrow}" Margin="2,4,0,0" Text="Text · Field · Image" />
-                    <TextBlock Style="{StaticResource Eyebrow}" Margin="2,2,0,0" Text="Spacer · Columns · Table · Rule · Panel" />
+                    <TextBlock Style="{StaticResource Eyebrow}" Margin="2,2,0,0" Text="Spacer · Columns · Table · Rule · Panel · Repeat" />
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource Eyebrow}" Margin="18,18,16,4" Text="REPORT BLOCKS" />
                 <ListBox x:Name="BlockList" Margin="16,0,16,8" Background="Transparent" BorderThickness="0"
