@@ -99,7 +99,7 @@ Charts, barcodes, a formula language, raw HTML in text, right-to-left layout, an
 | `src/ReportCreator.Builder` | WPF builder |
 | `samples/viewer-blazor` | Blazor host for the invoice fixture |
 | `samples/viewer-next` | Next.js host for the same HTML |
-| `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` |
+| `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` and `orders.html` |
 | `fixtures/invoice` | Invoice definition and data |
 | `fixtures/orders` | Nested repeats, four columns, and styled panels |
 | `tests/ReportCreator.Compile.Tests` | HTML checks, no browser |
