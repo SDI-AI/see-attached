@@ -602,10 +602,15 @@ public partial class MainWindow : Window
         {
             var block = list[index];
             sites.Add(new BlockSite(list, index, band, depth, block));
-            if (block is not ColumnsBlock columns)
-                continue;
-            for (var column = 0; column < columns.Columns.Count; column++)
-                Walk(columns.Columns[column].Blocks, band, depth + 1, sites);
+            if (block is ColumnsBlock columns)
+            {
+                for (var column = 0; column < columns.Columns.Count; column++)
+                    Walk(columns.Columns[column].Blocks, band, depth + 1, sites);
+            }
+            else if (block is PanelBlock panel)
+            {
+                Walk(panel.Blocks, band, depth + 1, sites);
+            }
         }
     }
 
@@ -615,6 +620,8 @@ public partial class MainWindow : Window
         "Image" => new ImageBlock { Id = NewId(), Source = TinyPng, Alt = "", WidthMm = 40 },
         "Spacer" => new SpacerBlock { Id = NewId(), HeightMm = 6 },
         "Columns" => new ColumnsBlock { Id = NewId(), Columns = [new Column(), new Column()] },
+        "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
+        "Panel" => new PanelBlock { Id = NewId() },
         "Table" => new TableBlock
         {
             Id = NewId(),
@@ -671,6 +678,8 @@ public partial class MainWindow : Window
             ImageBlock image => string.IsNullOrWhiteSpace(image.Alt) ? "Image" : FirstLine(image.Alt),
             SpacerBlock spacer => spacer.HeightMm.ToString(System.Globalization.CultureInfo.CurrentCulture) + " mm",
             ColumnsBlock columns => columns.Columns.Count + (columns.Columns.Count == 1 ? " column" : " columns"),
+            RuleBlock => "Rule",
+            PanelBlock panel => panel.Blocks.Count + (panel.Blocks.Count == 1 ? " block" : " blocks"),
             TableBlock table => table.DataPath,
             _ => ""
         };

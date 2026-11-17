@@ -1,6 +1,12 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, and 1.22. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, and 1.23. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.23
+
+- Text and fields can set font family, italic, underline, and line height. Blocks can set margin, padding, border, and background. A rule draws a horizontal line. A panel groups blocks inside a border.
+- Tables can set a font, cell padding, and cell borders.
+- Schema version 2 is current. Version 1 reports still compile.
 
 ## 1.22
 

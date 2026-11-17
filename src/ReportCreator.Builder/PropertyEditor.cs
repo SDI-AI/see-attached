@@ -35,22 +35,30 @@ internal static class PropertyEditor
         {
             case ModelText text:
                 AddText(panel, "Text", text.Text, value => text.Text = value, preview, multiline: true);
-                AddStyle(panel, text.FontSizePt, text.Bold, text.Color, text.Align,
-                    size => text.FontSizePt = size,
-                    bold => text.Bold = bold,
-                    color => text.Color = color,
-                    align => text.Align = align,
-                    preview);
+                AddStyle(panel, text, preview);
                 break;
             case FieldBlock field:
                 AddText(panel, "Path", field.Path, value => field.Path = value, preview, multiline: false);
                 AddText(panel, "Format", field.Format ?? "", value => field.Format = Blank(value), preview, multiline: false);
-                AddStyle(panel, field.FontSizePt, field.Bold, field.Color, field.Align,
+                AddStyle(panel, field.FontSizePt, field.Bold, field.Italic, field.Underline, field.FontFamily, field.LineHeight, field.Color, field.Align,
                     size => field.FontSizePt = size,
                     bold => field.Bold = bold,
+                    italic => field.Italic = italic,
+                    underline => field.Underline = underline,
+                    family => field.FontFamily = family,
+                    leading => field.LineHeight = leading,
                     color => field.Color = color,
                     align => field.Align = align,
                     preview);
+                break;
+            case RuleBlock rule:
+                AddMm(panel, "Thickness mm", rule.ThicknessMm, value => rule.ThicknessMm = value, preview);
+                AddText(panel, "Color", rule.Color ?? "", value => rule.Color = Blank(value), preview, multiline: false);
+                AddMm(panel, "Margin top mm", rule.MarginTopMm, value => rule.MarginTopMm = value, preview);
+                AddMm(panel, "Margin bottom mm", rule.MarginBottomMm, value => rule.MarginBottomMm = value, preview);
+                break;
+            case PanelBlock container:
+                AddPanelTools(panel, container, preview, rebuild);
                 break;
             case ImageBlock image:
                 AddText(panel, "Source", image.Source, value => image.Source = value, preview, multiline: true);
@@ -87,8 +95,11 @@ internal static class PropertyEditor
                 table.Aggregates ??= [];
                 AddAggregateList(panel, "Group totals", table.GroupAggregates, table, preview, rebuild);
                 AddAggregateList(panel, "Report totals", table.Aggregates, table, preview, rebuild);
+                AddTableStyle(panel, table, preview);
                 break;
         }
+
+        AddBoxStyle(panel, block, preview);
     }
 
     public static string Kind(Block block) => block switch
@@ -99,8 +110,25 @@ internal static class PropertyEditor
         SpacerBlock => "Spacer",
         ColumnsBlock => "Columns",
         TableBlock => "Table",
+        RuleBlock => "Rule",
+        PanelBlock => "Panel",
         _ => "Block"
     };
+
+    private static void AddPanelTools(StackPanel panel, PanelBlock container, Action preview, Action rebuild)
+    {
+        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Image", "Spacer", "Rule", "Table" }, SelectedIndex = 0 };
+        Use(kind, "FieldCombo");
+        panel.Children.Add(kind);
+        var button = Quiet("Add inside panel");
+        button.Click += (_, _) =>
+        {
+            container.Blocks.Add(NewBlock(kind.SelectedItem as string ?? "Text"));
+            rebuild();
+            preview();
+        };
+        panel.Children.Add(button);
+    }
 
     private static void AddColumnTools(StackPanel panel, ColumnsBlock columns, Action preview, Action rebuild)
     {
@@ -258,14 +286,36 @@ internal static class PropertyEditor
         panel.Children.Add(add);
     }
 
+    private static void AddStyle(StackPanel panel, ModelText text, Action preview)
+    {
+        AddStyle(panel, text.FontSizePt, text.Bold, text.Italic, text.Underline, text.FontFamily, text.LineHeight, text.Color, text.Align,
+            size => text.FontSizePt = size,
+            bold => text.Bold = bold,
+            italic => text.Italic = italic,
+            underline => text.Underline = underline,
+            family => text.FontFamily = family,
+            leading => text.LineHeight = leading,
+            color => text.Color = color,
+            align => text.Align = align,
+            preview);
+    }
+
     private static void AddStyle(
         StackPanel panel,
         decimal fontSize,
         bool bold,
+        bool italic,
+        bool underline,
+        string? fontFamily,
+        decimal? lineHeight,
         string? color,
         TextAlign align,
         Action<decimal> setSize,
         Action<bool> setBold,
+        Action<bool> setItalic,
+        Action<bool> setUnderline,
+        Action<string?> setFamily,
+        Action<decimal?> setLeading,
         Action<string?> setColor,
         Action<TextAlign> setAlign,
         Action preview)
@@ -276,8 +326,194 @@ internal static class PropertyEditor
             setBold(value);
             preview();
         });
+        AddCheck(panel, "Italic", italic, value =>
+        {
+            setItalic(value);
+            preview();
+        });
+        AddCheck(panel, "Underline", underline, value =>
+        {
+            setUnderline(value);
+            preview();
+        });
+        AddFontFamily(panel, fontFamily, setFamily, preview);
+        AddOptionalMm(panel, "Line height", lineHeight, setLeading, preview);
         AddText(panel, "Color", color ?? "", value => setColor(Blank(value)), preview, multiline: false);
         AddAlign(panel, align, setAlign, preview);
+    }
+
+    private static void AddFontFamily(StackPanel panel, string? family, Action<string?> set, Action preview)
+    {
+        AddLabel(panel, "Font");
+        var box = new ComboBox
+        {
+            ItemsSource = new[] { "", "Source Sans 3", "Arial", "Segoe UI", "Times New Roman", "Georgia", "Courier New" },
+            SelectedItem = family ?? ""
+        };
+        Use(box, "FieldCombo");
+        box.SelectionChanged += (_, _) =>
+        {
+            set(Blank(box.SelectedItem as string ?? ""));
+            preview();
+        };
+        panel.Children.Add(box);
+    }
+
+    private static void AddBoxStyle(StackPanel panel, Block block, Action preview)
+    {
+        AddLabel(panel, "Box");
+        var style = block.Style;
+        AddText(panel, "Background", style?.Background ?? "", value =>
+        {
+            style = EnsureStyle(block);
+            style.Background = Blank(value);
+            Tidy(block);
+            preview();
+        }, preview, multiline: false);
+        AddOptionalMm(panel, "Border mm", style?.Border?.WidthMm, value =>
+        {
+            if (value is null or <= 0)
+            {
+                if (block.Style is not null)
+                    block.Style.Border = null;
+            }
+            else
+            {
+                style = EnsureStyle(block);
+                style.Border ??= new BorderLine();
+                style.Border.WidthMm = value.Value;
+            }
+
+            Tidy(block);
+            preview();
+        }, preview);
+        AddText(panel, "Border color", style?.Border?.Color ?? "", value =>
+        {
+            style = EnsureStyle(block);
+            style.Border ??= new BorderLine { WidthMm = 0.3m };
+            style.Border.Color = Blank(value);
+            Tidy(block);
+            preview();
+        }, preview, multiline: false);
+        AddSpacing(panel, "Margin", () => block.Style?.Margin, value =>
+        {
+            var box = EnsureStyle(block);
+            box.Margin = value;
+            Tidy(block);
+            preview();
+        }, preview);
+        AddSpacing(panel, "Padding", () => block.Style?.Padding, value =>
+        {
+            var box = EnsureStyle(block);
+            box.Padding = value;
+            Tidy(block);
+            preview();
+        }, preview);
+    }
+
+    private static void AddTableStyle(StackPanel panel, TableBlock table, Action preview)
+    {
+        AddLabel(panel, "Table style");
+        var style = table.TableStyle;
+        AddFontFamily(panel, style?.FontFamily, value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.FontFamily = value;
+            TidyTable(table);
+            preview();
+        }, preview);
+        AddOptionalMm(panel, "Table font pt", style?.FontSizePt, value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.FontSizePt = value;
+            TidyTable(table);
+            preview();
+        }, preview);
+        AddCheck(panel, "Table italic", style?.Italic ?? false, value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.Italic = value;
+            TidyTable(table);
+            preview();
+        });
+        AddOptionalMm(panel, "Cell padding mm", style?.CellPaddingMm, value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.CellPaddingMm = value;
+            TidyTable(table);
+            preview();
+        }, preview);
+        AddOptionalMm(panel, "Cell border mm", style?.BorderWidthMm, value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.BorderWidthMm = value;
+            TidyTable(table);
+            preview();
+        }, preview);
+        AddText(panel, "Cell border color", style?.BorderColor ?? "", value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.BorderColor = Blank(value);
+            TidyTable(table);
+            preview();
+        }, preview, multiline: false);
+        AddText(panel, "Header background", style?.HeaderBackground ?? "", value =>
+        {
+            style = table.TableStyle ??= new TableStyle();
+            style.HeaderBackground = Blank(value);
+            TidyTable(table);
+            preview();
+        }, preview, multiline: false);
+    }
+
+    private static void AddSpacing(StackPanel panel, string name, Func<Spacing?> current, Action<Spacing?> set, Action preview)
+    {
+        AddMm(panel, name + " top mm", current()?.Top ?? 0, value => set(CopySpacing(current(), top: value)), preview);
+        AddMm(panel, name + " right mm", current()?.Right ?? 0, value => set(CopySpacing(current(), right: value)), preview);
+        AddMm(panel, name + " bottom mm", current()?.Bottom ?? 0, value => set(CopySpacing(current(), bottom: value)), preview);
+        AddMm(panel, name + " left mm", current()?.Left ?? 0, value => set(CopySpacing(current(), left: value)), preview);
+    }
+
+    private static Spacing? CopySpacing(Spacing? spacing, decimal? top = null, decimal? right = null, decimal? bottom = null, decimal? left = null)
+    {
+        var next = new Spacing
+        {
+            Top = top ?? spacing?.Top ?? 0,
+            Right = right ?? spacing?.Right ?? 0,
+            Bottom = bottom ?? spacing?.Bottom ?? 0,
+            Left = left ?? spacing?.Left ?? 0
+        };
+        return next.Top == 0 && next.Right == 0 && next.Bottom == 0 && next.Left == 0 ? null : next;
+    }
+
+    private static BoxStyle EnsureStyle(Block block) => block.Style ??= new BoxStyle();
+
+    private static void Tidy(Block block)
+    {
+        var style = block.Style;
+        if (style is null)
+            return;
+        if (style.Margin is { Top: 0, Right: 0, Bottom: 0, Left: 0 })
+            style.Margin = null;
+        if (style.Padding is { Top: 0, Right: 0, Bottom: 0, Left: 0 })
+            style.Padding = null;
+        if (style.Border is { WidthMm: <= 0 })
+            style.Border = null;
+        if (style.FontFamily is null && style.FontSizePt is null && style.Bold is null && !style.Italic && !style.Underline
+            && style.Color is null && style.LineHeight is null && style.Margin is null && style.Padding is null
+            && style.Border is null && style.Background is null)
+            block.Style = null;
+    }
+
+    private static void TidyTable(TableBlock table)
+    {
+        var style = table.TableStyle;
+        if (style is null)
+            return;
+        if (style.FontFamily is null && style.FontSizePt is null && !style.Italic && style.Color is null
+            && style.CellPaddingMm is null && style.BorderWidthMm is null && style.BorderColor is null
+            && style.HeaderBackground is null && style.Background is null)
+            table.TableStyle = null;
     }
 
     private static void AddAlign(StackPanel panel, TextAlign align, Action<TextAlign> set, Action preview)
@@ -410,6 +646,14 @@ internal static class PropertyEditor
     private static Block NewBlock(string kind) => kind switch
     {
         "Field" => new FieldBlock { Id = NewId(), Path = "name" },
+        "Image" => new ImageBlock { Id = NewId(), Source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", Alt = "" },
+        "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
+        "Table" => new TableBlock
+        {
+            Id = NewId(),
+            DataPath = "lines",
+            Columns = [new TableColumn { Header = "Description", Path = "description" }]
+        },
         "Spacer" => new SpacerBlock { Id = NewId(), HeightMm = 6 },
         _ => new ModelText { Id = NewId(), Text = "Text" }
     };

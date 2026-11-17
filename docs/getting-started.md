@@ -111,8 +111,10 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 
 | Block | Use it for |
 | --- | --- |
-| Text | Words, plus `{path}` or `{path:format}` tokens. A newline in the text is a line break. |
-| Field | One value, such as `invoice.billTo.name`. Same font, bold, color, and alignment as text. |
+| Text | Words, plus `{path}` or `{path:format}` tokens. A newline in the text is a line break. Font family, italic, underline, and line height are stored on the block. |
+| Field | One value, such as `invoice.billTo.name`. Same font, bold, italic, underline, color, and alignment as text. |
+| Rule | A horizontal line. Thickness and color are on the block. |
+| Panel | A group of blocks with its own padding, border, and background. |
 | Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | Two or three equal columns. The builder adds text, field, and spacer inside a column. A columns block cannot contain another columns block. |
@@ -130,6 +132,16 @@ With culture `en-US`, `{invoice.date:MMMM d, yyyy}` prints `March 14, 2026`. A f
 ```json
 { "type": "field", "id": "customer", "path": "invoice.billTo.name", "bold": true }
 ```
+
+A letter can set the typeface on the block. A rule and a panel do not need a free canvas. The same JSON is what the builder saves, what the compiler paints, and what the PDF prints. Schema version 2 is current. A version 1 file still opens.
+
+```json
+{ "type": "text", "id": "greeting", "text": "Dear customer,", "fontFamily": "Times New Roman", "italic": true, "underline": true, "lineHeight": 1.35 }
+{ "type": "rule", "id": "rule", "thicknessMm": 0.4, "color": "#111827" }
+{ "type": "panel", "id": "notes", "style": { "background": "#f8fafc", "padding": { "top": 3, "right": 3, "bottom": 3, "left": 3 }, "border": { "widthMm": 0.3, "color": "#1f2937" } }, "blocks": [] }
+```
+
+Font names are Source Sans 3, Arial, Segoe UI, Times New Roman, Georgia, and Courier New. Source Sans 3 is embedded. The others are used when the computer has them.
 
 A table's `dataPath` points at the array. Each column path is relative to one row:
 
