@@ -19,10 +19,26 @@ body {
 }
 .block { margin: 0 0 2mm; }
 .block:last-child { margin-bottom: 0; }
-.keep, tr { break-inside: avoid; }
-.cols { display: grid; gap: 8mm; }
-.cols-2 { grid-template-columns: 1fr 1fr; }
-.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.keep, tr { break-inside: avoid; page-break-inside: avoid; }
+table.page-frame { width: 100%; border-collapse: collapse; }
+table.page-frame > thead { display: table-header-group; }
+table.page-frame > tfoot { display: table-footer-group; }
+table.page-frame > thead > tr > td, table.page-frame > tfoot > tr > td, table.page-frame > tbody > tr > td { padding: 0; border: 0; background: none; vertical-align: top; }
+table.page-frame > tbody > tr { break-inside: auto; page-break-inside: auto; }
+.page-chrome { overflow: hidden; }
+table.layout-fixed { table-layout: fixed; }
+.break-before { break-before: page; page-break-before: always; }
+.break-after { break-after: page; page-break-after: always; }
+.repeat-item { margin: 0 0 4mm; }
+.repeat-item:last-child { margin-bottom: 0; }
+.group-wrap { margin: 0 0 4mm; }
+.group-wrap:last-child { margin-bottom: 0; }
+tr.group-head { break-after: avoid; }
+tr.group-head th, tr.group-head td { font-weight: 700; background: #f9fafb; border-bottom: 0.3mm solid #111827; }
+tr.group-foot td { font-weight: 700; border-top: 0.2mm solid #9ca3af; }
+.cols { display: grid; gap: 8mm; align-items: start; }
+.cols-2 { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.cols-3 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
 table { width: 100%; border-collapse: collapse; }
 thead { display: table-header-group; }
 th, td { padding: 1.5mm 2mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
@@ -32,13 +48,14 @@ tfoot td { font-weight: 700; border-top: 0.4mm solid #111827; border-bottom: 0; 
 .center { text-align: center; }
 img.block { display: block; max-width: 100%; }
 .rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
-body.design .block { cursor: pointer; }
+body.design .block { cursor: pointer; outline: 1px solid #d1d5db; }
+body.design .block.rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
 @page { size: 210mm 297mm; margin: 12mm 12mm 12mm 12mm; }
 @media print {
   body { background: #fff; }
   .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
-  .rc-selected { outline: none; }
-}</style></head><body><article class="sheet" data-rc="1"><section class="band"><div class="block cols cols-2 keep" data-id="hdr-cols"><div class="col"><div class="block" data-id="title" style="font-size:28pt;text-align:left;font-weight:700;white-space:pre-wrap;">Invoice</div></div><div class="col"><div class="block" data-id="meta" style="font-size:11pt;text-align:right;white-space:pre-wrap;">No. INV-1001
-March 14, 2026</div></div></div></section><section class="band"><div class="block spacer" data-id="sp1" style="height:8mm"></div><div class="block cols cols-2 keep" data-id="addr"><div class="col"><div class="block" data-id="bill-label" style="font-size:9pt;text-align:left;font-weight:700;color:#6b7280;white-space:pre-wrap;">Bill to</div><div class="block" data-id="bill" style="font-size:11pt;text-align:left;white-space:pre-wrap;">Northwind Traders
+  .rc-selected, body.design .block { outline: none; }
+}</style></head><body><article class="sheet" data-rc="1"><section class="band"><div class="block cols cols-2 keep" data-id="hdr-cols" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;"><div class="col"><div class="block" data-id="title" style="font-size:28pt;text-align:left;font-weight:700;white-space:pre-wrap;">Invoice</div></div><div class="col"><div class="block" data-id="meta" style="font-size:11pt;text-align:right;white-space:pre-wrap;">No. INV-1001
+March 14, 2026</div></div></div></section><section class="band"><div class="block spacer" data-id="sp1" style="height:8mm;"></div><div class="block cols cols-2 keep" data-id="addr" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;"><div class="col"><div class="block" data-id="bill-label" style="font-size:9pt;text-align:left;font-weight:700;color:#6b7280;white-space:pre-wrap;">Bill to</div><div class="block" data-id="bill" style="font-size:11pt;text-align:left;white-space:pre-wrap;">Northwind Traders
 Seattle</div></div><div class="col"><div class="block" data-id="from-label" style="font-size:9pt;text-align:left;font-weight:700;color:#6b7280;white-space:pre-wrap;">From</div><div class="block" data-id="from" style="font-size:11pt;text-align:left;white-space:pre-wrap;">Contoso Press
-Redmond</div></div></div><div class="block spacer" data-id="sp2" style="height:8mm"></div><table class="block" data-id="lines"><thead><tr><th class="left">Description</th><th class="right" style="width:20mm">Qty</th><th class="right" style="width:30mm">Price</th><th class="right" style="width:30mm">Amount</th></tr></thead><tbody><tr><td class="left">Widget</td><td class="right">2</td><td class="right">$12.50</td><td class="right">$25.00</td></tr><tr><td class="left">Gadget</td><td class="right">1</td><td class="right">$40.00</td><td class="right">$40.00</td></tr></tbody><tfoot><tr><td class="left">Total</td><td class="right"></td><td class="right"></td><td class="right">$65.00</td></tr></tfoot></table></section><section class="band"><div class="block spacer" data-id="sp3" style="height:6mm"></div><div class="block" data-id="thanks" style="font-size:10pt;text-align:left;color:#6b7280;white-space:pre-wrap;">Thank you.</div></section></article></body></html>
+Redmond</div></div></div><div class="block spacer" data-id="sp2" style="height:8mm;"></div><table class="block layout-fixed" data-id="lines"><colgroup><col><col style="width:20mm"><col style="width:30mm"><col style="width:30mm"></colgroup><thead><tr><th class="left">Description</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Amount</th></tr></thead><tbody><tr><td class="left">Widget</td><td class="right">2</td><td class="right">$12.50</td><td class="right">$25.00</td></tr><tr><td class="left">Gadget</td><td class="right">1</td><td class="right">$40.00</td><td class="right">$40.00</td></tr></tbody><tfoot><tr><td class="left">Total</td><td class="right"></td><td class="right"></td><td class="right">$65.00</td></tr></tfoot></table></section><section class="band"><div class="block spacer" data-id="sp3" style="height:6mm;"></div><div class="block" data-id="thanks" style="font-size:10pt;text-align:left;color:#6b7280;white-space:pre-wrap;">Thank you.</div></section></article></body></html>

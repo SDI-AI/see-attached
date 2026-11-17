@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <Content Include="..\..\fixtures\invoice\*.json" Link="fixtures\invoice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\fixtures\orders\*.json" Link="fixtures\orders\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

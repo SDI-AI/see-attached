@@ -130,6 +130,19 @@ public static partial class ReportBindings
             case TextBlock text:
                 foreach (Match match in Token().Matches(text.Text))
                     AddScoped(add, match.Groups[1].Value, ReportBindingKind.Value, match.Groups[2].Success ? match.Groups[2].Value : null, itemPath, parentPath);
+                if (text.Runs is not null)
+                {
+                    foreach (var run in text.Runs)
+                    {
+                        if (!string.IsNullOrWhiteSpace(run.Path))
+                            AddScoped(add, run.Path, ReportBindingKind.Value, run.Format, itemPath, parentPath);
+                        foreach (Match match in Token().Matches(run.Text ?? ""))
+                            AddScoped(add, match.Groups[1].Value, ReportBindingKind.Value, match.Groups[2].Success ? match.Groups[2].Value : null, itemPath, parentPath);
+                    }
+                }
+                break;
+            case ImageBlock image when !string.IsNullOrWhiteSpace(image.SourcePath):
+                AddScoped(add, image.SourcePath, ReportBindingKind.Value, null, itemPath, parentPath);
                 break;
             case FieldBlock field when field.Path.Length > 0:
                 AddScoped(add, field.Path, ReportBindingKind.Value, field.Format, itemPath, parentPath);

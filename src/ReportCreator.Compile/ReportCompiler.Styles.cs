@@ -1,11 +1,52 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using ReportCreator.Model;
 
 namespace ReportCreator.Compile;
 
 public static partial class ReportCompiler
 {
+    private static string TextStyle(TextBlock text)
+    {
+        var css = TextStyle(text.FontSizePt, text.Bold, text.Italic, text.Underline, text.FontFamily, text.LineHeight, text.Color, text.Align, text.Style);
+        if (text.SpaceBeforeMm is decimal before)
+            css += "margin-top:" + Num(before) + "mm;";
+        if (text.SpaceAfterMm is decimal after)
+            css += "margin-bottom:" + Num(after) + "mm;";
+        return css;
+    }
+
+    private static void AppendRun(StringBuilder html, TextRun run, ReportDefinition definition, DataScope scope, CompileOptions options)
+    {
+        var body = string.IsNullOrWhiteSpace(run.Path)
+            ? Expand(run.Text, definition, scope, options)
+            : Encode(ResolveText(run.Path, run.Format, definition, scope, options));
+        html.Append("<span");
+        if (run.Bold || run.Italic || run.Underline)
+        {
+            html.Append(" style=\"");
+            if (run.Bold)
+                html.Append("font-weight:700;");
+            if (run.Italic)
+                html.Append("font-style:italic;");
+            if (run.Underline)
+                html.Append("text-decoration:underline;");
+            html.Append('"');
+        }
+
+        html.Append('>').Append(body).Append("</span>");
+    }
+
+    private static string ImageSource(ImageBlock image, DataScope scope)
+    {
+        if (string.IsNullOrWhiteSpace(image.SourcePath))
+            return image.Source;
+        if (!scope.TryGet(image.SourcePath, out var value) || value.ValueKind != JsonValueKind.String)
+            return "";
+        return value.GetString() ?? "";
+    }
+
     private static string TextStyle(decimal fontSizePt, bool bold, bool italic, bool underline, string? fontFamily, decimal? lineHeight, string? color, TextAlign align, BoxStyle? box)
     {
         var css = new StringBuilder();

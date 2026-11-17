@@ -3,16 +3,23 @@ using ReportCreator.Compile;
 using ReportCreator.Model;
 
 var root = FindRoot();
-var definition = ReportJson.Read(File.ReadAllText(Path.Combine(root, "fixtures", "invoice", "definition.json")));
-var data = ReportJson.ReadData(File.ReadAllText(Path.Combine(root, "fixtures", "invoice", "data.json")));
-var html = ReportCompiler.Compile(definition, data, new CompileOptions
+WriteHtml(root, "invoice");
+WriteHtml(root, "orders");
+
+static void WriteHtml(string root, string name)
 {
-    Culture = CultureInfo.GetCultureInfo("en-US")
-});
-var output = Path.Combine(root, "samples", "viewer-next", "public", "invoice.html");
-Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-File.WriteAllText(output, html);
-Console.WriteLine(output);
+    var definition = ReportJson.Read(File.ReadAllText(Path.Combine(root, "fixtures", name, "definition.json")));
+    var data = ReportJson.ReadData(File.ReadAllText(Path.Combine(root, "fixtures", name, "data.json")));
+    var html = ReportCompiler.Compile(definition, data, new CompileOptions
+    {
+        Culture = CultureInfo.GetCultureInfo("en-US"),
+        Clock = new DateTimeOffset(2026, 4, 2, 9, 0, 0, TimeSpan.Zero)
+    });
+    var output = Path.Combine(root, "samples", "viewer-next", "public", name + ".html");
+    Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+    File.WriteAllText(output, html);
+    Console.WriteLine(output);
+}
 
 static string FindRoot()
 {

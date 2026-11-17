@@ -2,7 +2,7 @@
 
 See Attached builds the report that rides along as an attachment. The definition is the layout, saved as JSON. The data is a separate JSON object. A `.rcdata` file stores that object with field types, and more than one report can compile it. .NET binds them and compiles one HTML file. A browser shows that HTML. Playwright prints the same HTML to PDF.
 
-The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds.
+The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds. `fixtures/orders` is a second example: nested repeats, four columns, a rule, and bordered panels.
 
 ## Requirements
 
@@ -111,12 +111,12 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 
 | Block | Use it for |
 | --- | --- |
-| Text | Words, plus `{path}` or `{path:format}` tokens. A newline in the text is a line break. Font family, italic, underline, and line height are stored on the block. |
+| Text | Words, plus `{path}` or `{path:format}` tokens. A newline in the text is a line break. Font family, italic, underline, and line height are stored on the block. `runs` is a list of pieces with their own bold, italic, and underline. A run can set `path` instead of text. `spaceBeforeMm` and `spaceAfterMm` are the paragraph gap. |
 | Field | One value, such as `invoice.billTo.name`. Same font, bold, italic, underline, color, and alignment as text. |
 | Rule | A horizontal line. Thickness and color are on the block. |
 | Panel | A group of blocks with its own padding, border, and background. |
 | Repeat | One copy of its blocks for each object in an array. Inside it, `{item.name}` is the current object, `{parent.name}` is the enclosing object, and `{root.company}` is the document. A repeat can contain another repeat. **Keep each item together** avoids splitting an item that fits on the next page. **Break before later items** starts each item after the first on a new page. |
-| Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. Width and height are millimetres. |
+| Image | An `https://` URL, or a PNG, JPEG, GIF, or WebP data URI stored in the JSON. `sourcePath` reads that same kind of value from the data, for example `item.photo`. `fit` is `none` or `contain`. Width and height are millimetres. A missing value, or a block hidden by show-when, draws no image. |
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | One to eight columns. Set `widthMm` or `weight` on a column. A column with neither shares the remaining width. The builder can add a text, field, spacer, table, or panel inside a column. A columns block may contain one more columns block, and that inner block cannot contain another. |
 | Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. A column `widthMm` is written on a `colgroup`, so the width holds when the header is hidden and when a group title spans the table. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |

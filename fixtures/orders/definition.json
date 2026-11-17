@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 4,
+  "name": "Orders",
+  "page": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 },
+    "pageHeaderMm": 12,
+    "pageFooterMm": 10,
+    "pageNumbers": "bottomRight"
+  },
+  "pageHeader": {
+    "blocks": [
+      { "type": "text", "id": "running", "text": "Orders", "bold": true, "fontFamily": "Segoe UI", "fontSizePt": 14 }
+    ]
+  },
+  "pageFooter": {
+    "blocks": [
+      { "type": "text", "id": "copy", "text": "File copy  {print.date:yyyy-MM-dd}", "fontSizePt": 9, "color": "#4b5563" }
+    ]
+  },
+  "body": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "greeting",
+        "fontFamily": "Times New Roman",
+        "fontSizePt": 12,
+        "italic": true,
+        "lineHeight": 1.35,
+        "spaceAfterMm": 2,
+        "runs": [
+          { "text": "Prepared for " },
+          { "path": "company", "bold": true },
+          { "text": "." }
+        ]
+      },
+      { "type": "rule", "id": "rule", "thicknessMm": 0.4, "color": "#111827", "marginBottomMm": 3 },
+      {
+        "type": "repeat",
+        "id": "orders",
+        "dataPath": "orders",
+        "keepItemTogether": true,
+        "blocks": [
+          {
+            "type": "panel",
+            "id": "order-panel",
+            "style": {
+              "background": "#f8fafc",
+              "padding": { "top": 2, "right": 3, "bottom": 2, "left": 3 },
+              "border": { "widthMm": 0.3, "color": "#1f2937" },
+              "margin": { "bottom": 3 }
+            },
+            "blocks": [
+              { "type": "text", "id": "order-id", "text": "Order {item.id}", "bold": true, "fontSizePt": 14 },
+              { "type": "text", "id": "order-who", "text": "{item.customer}  ·  {root.company}", "fontFamily": "Segoe UI" }
+            ]
+          },
+          {
+            "type": "repeat",
+            "id": "lines",
+            "dataPath": "item.lines",
+            "keepItemTogether": true,
+            "blocks": [
+              {
+                "type": "panel",
+                "id": "line-panel",
+                "keepTogether": true,
+                "style": {
+                  "padding": { "top": 2, "right": 2, "bottom": 2, "left": 2 },
+                  "border": { "widthMm": 0.2, "color": "#9ca3af" },
+                  "margin": { "bottom": 3 }
+                },
+                "blocks": [
+                  { "type": "text", "id": "line-title", "text": "{item.id}  {item.title}", "italic": true },
+                  { "type": "text", "id": "line-parent", "text": "For {parent.customer}", "fontSizePt": 9, "color": "#4b5563" },
+                  {
+                    "type": "columns",
+                    "id": "lists",
+                    "gapMm": 4,
+                    "columns": [
+                      {
+                        "widthMm": 70,
+                        "blocks": [
+                          { "type": "text", "id": "h-notes", "text": "Notes", "bold": true, "fontSizePt": 9 },
+                          {
+                            "type": "table",
+                            "id": "notes",
+                            "dataPath": "item.notes",
+                            "showHeader": false,
+                            "tableStyle": { "fontSizePt": 9, "cellPaddingMm": 1, "borderWidthMm": 0 },
+                            "columns": [ { "header": "Text", "path": "text" } ]
+                          }
+                        ]
+                      },
+                      {
+                        "widthMm": 32,
+                        "blocks": [
+                          { "type": "text", "id": "h-parts", "text": "Parts", "bold": true, "fontSizePt": 9 },
+                          {
+                            "type": "table",
+                            "id": "parts",
+                            "dataPath": "item.parts",
+                            "showHeader": false,
+                            "tableStyle": { "fontSizePt": 9, "cellPaddingMm": 1, "borderWidthMm": 0 },
+                            "columns": [ { "header": "Sku", "path": "sku" } ]
+                          }
+                        ]
+                      },
+                      {
+                        "widthMm": 28,
+                        "blocks": [
+                          { "type": "text", "id": "h-tasks", "text": "Tasks", "bold": true, "fontSizePt": 9 },
+                          {
+                            "type": "table",
+                            "id": "tasks",
+                            "dataPath": "item.tasks",
+                            "showHeader": false,
+                            "tableStyle": { "fontSizePt": 9, "cellPaddingMm": 1, "borderWidthMm": 0 },
+                            "columns": [ { "header": "Name", "path": "name" } ]
+                          }
+                        ]
+                      },
+                      {
+                        "blocks": [
+                          { "type": "text", "id": "h-charges", "text": "Charges", "bold": true, "fontSizePt": 9 },
+                          {
+                            "type": "table",
+                            "id": "charges",
+                            "dataPath": "item.charges",
+                            "showHeader": false,
+                            "tableStyle": { "fontFamily": "Arial", "fontSizePt": 9, "cellPaddingMm": 1, "borderWidthMm": 0.15, "borderColor": "#d1d5db" },
+                            "columns": [ { "header": "Name", "path": "name" } ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
