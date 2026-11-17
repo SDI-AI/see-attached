@@ -13,6 +13,29 @@ public static partial class StyleRules
     public static bool IsBindingPath(string? path) =>
         path is not null && BindingPath().IsMatch(path);
 
+    public static bool IsFontFamily(string? family) =>
+        family is not null && AllowedFonts.Contains(family);
+
+    public static string FontStack(string? family) => family switch
+    {
+        "Arial" => "Arial, \"Source Sans 3\", sans-serif",
+        "Segoe UI" => "\"Segoe UI\", \"Source Sans 3\", sans-serif",
+        "Times New Roman" => "\"Times New Roman\", \"Source Sans 3\", serif",
+        "Georgia" => "Georgia, \"Source Sans 3\", serif",
+        "Courier New" => "\"Courier New\", \"Source Sans 3\", monospace",
+        _ => "\"Source Sans 3\", sans-serif"
+    };
+
+    private static readonly HashSet<string> AllowedFonts = new(StringComparer.Ordinal)
+    {
+        "Source Sans 3",
+        "Arial",
+        "Segoe UI",
+        "Times New Roman",
+        "Georgia",
+        "Courier New"
+    };
+
     [GeneratedRegex("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")]
     private static partial Regex HexColor();
 

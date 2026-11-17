@@ -140,6 +140,10 @@ public static partial class ReportBindings
                         Walk(child, add);
                 }
                 break;
+            case PanelBlock panel:
+                foreach (var child in panel.Blocks ?? [])
+                    Walk(child, add);
+                break;
             case TableBlock table when table.DataPath.Length > 0:
                 add(new ReportBinding(table.DataPath, ReportBindingKind.Table));
                 foreach (var column in table.Columns)

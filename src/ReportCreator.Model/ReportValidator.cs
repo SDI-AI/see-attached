@@ -10,7 +10,7 @@ public static partial class ReportValidator
         ArgumentNullException.ThrowIfNull(definition);
         var errors = new List<string>();
 
-        if (definition.SchemaVersion != ReportDefinition.CurrentSchemaVersion)
+        if (definition.SchemaVersion < ReportDefinition.MinimumSchemaVersion || definition.SchemaVersion > ReportDefinition.CurrentSchemaVersion)
             errors.Add($"Schema version {definition.SchemaVersion} is not supported. Use version {ReportDefinition.CurrentSchemaVersion}.");
 
         if (string.IsNullOrWhiteSpace(definition.Name) || definition.Name.Trim().Length > 120)
@@ -35,11 +35,11 @@ public static partial class ReportValidator
 
         var parameters = ValidateParameters(definition, errors);
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        ValidateBand(definition.Header, "Header", errors, ids, parameters, insideColumns: false);
-        ValidateBand(definition.Body, "Body", errors, ids, parameters, insideColumns: false);
-        ValidateBand(definition.Footer, "Footer", errors, ids, parameters, insideColumns: false);
-        ValidateBand(definition.PageHeader, "Page header", errors, ids, parameters, insideColumns: false);
-        ValidateBand(definition.PageFooter, "Page footer", errors, ids, parameters, insideColumns: false);
+        ValidateBand(definition.Header, "Header", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
+        ValidateBand(definition.Body, "Body", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
+        ValidateBand(definition.Footer, "Footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
+        ValidateBand(definition.PageHeader, "Page header", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
+        ValidateBand(definition.PageFooter, "Page footer", errors, ids, parameters, columnDepth: 0, panelDepth: 0);
         if (definition.Page is not null && definition.Page.Margin is not null && errors.All(error => !error.Contains("no room for content", StringComparison.Ordinal)))
             ValidateChromeRoom(definition, errors);
         return errors;
@@ -115,13 +115,13 @@ public static partial class ReportValidator
         return names;
     }
 
-    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, bool insideColumns)
+    private static void ValidateBand(Band band, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth)
     {
         foreach (var block in band.Blocks)
-            ValidateBlock(block, scope, errors, ids, parameters, insideColumns);
+            ValidateBlock(block, scope, errors, ids, parameters, columnDepth, panelDepth);
     }
 
-    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, bool insideColumns)
+    private static void ValidateBlock(Block block, string scope, List<string> errors, HashSet<string> ids, HashSet<string> parameters, int columnDepth, int panelDepth)
     {
         if (string.IsNullOrWhiteSpace(block.Id) || block.Id.Length > 64 || block.Id.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
             errors.Add($"{scope} has a block whose id is missing or not a short letter, digit, '_' or '-' id.");
@@ -129,6 +129,7 @@ public static partial class ReportValidator
             errors.Add($"Block id '{block.Id}' is used more than once.");
 
         var where = $"{scope} block '{block.Id}'";
+        ValidateBox(where, block.Style, errors);
         if (block.When is { } when)
         {
             if (!StyleRules.IsBindingPath(when.Path))
@@ -149,13 +150,29 @@ public static partial class ReportValidator
                 foreach (Match match in Token().Matches(text.Text))
                     CheckParameter(match.Groups[1].Value, where, parameters, errors);
                 ValidateStyle(where, text.FontSizePt, text.Color, errors);
+                ValidateFont(where, text.FontFamily, text.LineHeight, errors);
                 break;
             case FieldBlock field:
                 if (!StyleRules.IsBindingPath(field.Path))
                     errors.Add($"{where} needs a binding path such as customer.name.");
                 CheckParameter(field.Path, where, parameters, errors);
                 ValidateStyle(where, field.FontSizePt, field.Color, errors);
+                ValidateFont(where, field.FontFamily, field.LineHeight, errors);
                 ValidateFormat(where, field.Format, errors);
+                break;
+            case RuleBlock rule:
+                RequireMm(rule.ThicknessMm, $"{where} rule thickness", errors, positive: true);
+                RequireMm(rule.MarginTopMm, $"{where} rule margin", errors, positive: false);
+                RequireMm(rule.MarginBottomMm, $"{where} rule margin", errors, positive: false);
+                if (rule.Color is not null && !StyleRules.IsHexColor(rule.Color))
+                    errors.Add($"{where} color must be a #RGB or #RRGGBB value.");
+                break;
+            case PanelBlock panel:
+                if (panelDepth >= 6)
+                    errors.Add($"{where} is nested too deeply.");
+                panel.Blocks ??= [];
+                foreach (var child in panel.Blocks)
+                    ValidateBlock(child, scope, errors, ids, parameters, columnDepth, panelDepth + 1);
                 break;
             case ImageBlock image:
                 if (!ImageSources.IsAllowed(image.Source))
@@ -169,14 +186,15 @@ public static partial class ReportValidator
                 RequireMm(spacer.HeightMm, $"{where} spacer height", errors, positive: true);
                 break;
             case ColumnsBlock columns:
-                if (insideColumns)
+                if (columnDepth >= 1)
                     errors.Add($"{where} cannot contain another columns block.");
                 if (columns.Columns.Count is not 2 and not 3)
                     errors.Add($"{where} must have two or three columns.");
                 foreach (var column in columns.Columns)
                 {
+                    column.Blocks ??= [];
                     foreach (var child in column.Blocks)
-                        ValidateBlock(child, scope, errors, ids, parameters, insideColumns: true);
+                        ValidateBlock(child, scope, errors, ids, parameters, columnDepth + 1, panelDepth);
                 }
                 break;
             case TableBlock table:
@@ -199,6 +217,7 @@ public static partial class ReportValidator
                     RequireMm(column.WidthMm, $"{where} column width", errors, positive: true, allowNull: true);
                 }
 
+                ValidateTableStyle(where, table.TableStyle, errors);
                 foreach (var aggregate in table.Aggregates.Concat(table.GroupAggregates))
                 {
                     if (table.Columns.All(column => column.Path != aggregate.ColumnPath))
@@ -223,6 +242,67 @@ public static partial class ReportValidator
             errors.Add($"{where} font size must be between 6 and 96 points.");
         if (color is not null && !StyleRules.IsHexColor(color))
             errors.Add($"{where} color must be a #RGB or #RRGGBB value.");
+    }
+
+    private static void ValidateFont(string where, string? family, decimal? lineHeight, List<string> errors)
+    {
+        if (family is not null && !StyleRules.IsFontFamily(family))
+            errors.Add($"{where} font must be Source Sans 3, Arial, Segoe UI, Times New Roman, Georgia, or Courier New.");
+        if (lineHeight is not null && (lineHeight is < 0.8m or > 3m || !StyleRules.HasAtMostTwoDecimalPlaces(lineHeight.Value)))
+            errors.Add($"{where} line height must be between 0.8 and 3.");
+    }
+
+    private static void ValidateBox(string where, BoxStyle? style, List<string> errors)
+    {
+        if (style is null)
+            return;
+
+        ValidateFont(where, style.FontFamily, style.LineHeight, errors);
+        if (style.FontSizePt is decimal size)
+            ValidateStyle(where, size, style.Color, errors);
+        else if (style.Color is not null && !StyleRules.IsHexColor(style.Color))
+            errors.Add($"{where} color must be a #RGB or #RRGGBB value.");
+        if (style.Background is not null && !StyleRules.IsHexColor(style.Background))
+            errors.Add($"{where} background must be a #RGB or #RRGGBB value.");
+        ValidateSpacing(where, "margin", style.Margin, errors);
+        ValidateSpacing(where, "padding", style.Padding, errors);
+        if (style.Border is { } border)
+        {
+            RequireMm(border.WidthMm, $"{where} border width", errors, positive: true);
+            if (border.Color is not null && !StyleRules.IsHexColor(border.Color))
+                errors.Add($"{where} border color must be a #RGB or #RRGGBB value.");
+        }
+    }
+
+    private static void ValidateTableStyle(string where, TableStyle? style, List<string> errors)
+    {
+        if (style is null)
+            return;
+
+        ValidateFont(where, style.FontFamily, null, errors);
+        if (style.FontSizePt is decimal size)
+            ValidateStyle(where, size, style.Color, errors);
+        else if (style.Color is not null && !StyleRules.IsHexColor(style.Color))
+            errors.Add($"{where} color must be a #RGB or #RRGGBB value.");
+        if (style.HeaderBackground is not null && !StyleRules.IsHexColor(style.HeaderBackground))
+            errors.Add($"{where} header background must be a #RGB or #RRGGBB value.");
+        if (style.Background is not null && !StyleRules.IsHexColor(style.Background))
+            errors.Add($"{where} background must be a #RGB or #RRGGBB value.");
+        RequireMm(style.CellPaddingMm, $"{where} cell padding", errors, positive: false, allowNull: true);
+        RequireMm(style.BorderWidthMm, $"{where} border width", errors, positive: false, allowNull: true);
+        if (style.BorderColor is not null && !StyleRules.IsHexColor(style.BorderColor))
+            errors.Add($"{where} border color must be a #RGB or #RRGGBB value.");
+    }
+
+    private static void ValidateSpacing(string where, string name, Spacing? spacing, List<string> errors)
+    {
+        if (spacing is null)
+            return;
+
+        RequireMm(spacing.Top, $"{where} {name}", errors, positive: false);
+        RequireMm(spacing.Right, $"{where} {name}", errors, positive: false);
+        RequireMm(spacing.Bottom, $"{where} {name}", errors, positive: false);
+        RequireMm(spacing.Left, $"{where} {name}", errors, positive: false);
     }
 
     private static void ValidateFormat(string where, string? format, List<string> errors)

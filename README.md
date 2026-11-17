@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.22. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.23. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,12 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.23 adds
+
+- Text and fields can set a font family, italic, underline, and line height. Blocks and panels can set margin, padding, border, and background. A rule is a horizontal line. A panel is a bordered group of blocks. Tables can set font, cell padding, and borders.
+- Font names are Source Sans 3, Arial, Segoe UI, Times New Roman, Georgia, and Courier New. Source Sans 3 is embedded. The others are used when the machine has them, and fall back to Source Sans 3.
+- Report schema version 2 is current. Version 1 files still open.
 
 ## What 1.22 adds
 
@@ -142,7 +148,7 @@ The page is `http://localhost:8080`. The image sets `REPORTCREATOR_CONTAINER=1`,
 
 ## Fonts
 
-Source Sans 3 regular and bold are embedded in the HTML (Latin subset, SIL Open Font License 1.1). The license is `src/ReportCreator.Compile/Fonts/OFL.txt`. Characters outside that subset fall back to the host's font, so a Linux PDF host can wrap those words differently.
+Source Sans 3 regular and bold are embedded in the HTML (Latin subset, SIL Open Font License 1.1). The license is `src/ReportCreator.Compile/Fonts/OFL.txt`. A report can also name Arial, Segoe UI, Times New Roman, Georgia, or Courier New. Those families are not embedded. When the host does not have one, the text uses Source Sans 3. Characters outside the embedded subset fall back to the host's font, so a Linux PDF host can wrap those words differently.
 
 ## Dependencies
 

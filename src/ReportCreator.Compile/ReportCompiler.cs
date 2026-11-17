@@ -104,7 +104,7 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(text.Id))
-                    .Append("\" style=\"").Append(StyleOf(text.FontSizePt, text.Bold, text.Color, text.Align))
+                    .Append("\" style=\"").Append(TextStyle(text.FontSizePt, text.Bold, text.Italic, text.Underline, text.FontFamily, text.LineHeight, text.Color, text.Align, text.Style))
                     .Append("\">")
                     .Append(Expand(text.Text, definition, data, options))
                     .Append("</div>");
@@ -114,10 +114,28 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(field.Id))
-                    .Append("\" style=\"").Append(StyleOf(field.FontSizePt, field.Bold, field.Color, field.Align))
+                    .Append("\" style=\"").Append(TextStyle(field.FontSizePt, field.Bold, field.Italic, field.Underline, field.FontFamily, field.LineHeight, field.Color, field.Align, field.Style))
                     .Append("\">")
                     .Append(Encode(fieldText))
                     .Append("</div>");
+                break;
+            case RuleBlock rule:
+                html.Append("<div class=\"block rule")
+                    .Append(flags)
+                    .Append("\" data-id=\"").Append(Encode(rule.Id))
+                    .Append("\" style=\"").Append(RuleStyle(rule))
+                    .Append("\"></div>");
+                break;
+            case PanelBlock panel:
+                html.Append("<div class=\"block panel")
+                    .Append(flags)
+                    .Append("\" data-id=\"").Append(Encode(panel.Id))
+                    .Append('"');
+                AppendStyleAttribute(html, BoxCss(panel.Style));
+                html.Append('>');
+                foreach (var child in panel.Blocks)
+                    RenderBlock(html, child, definition, data, options);
+                html.Append("</div>");
                 break;
             case ImageBlock image:
                 html.Append("<img class=\"block")
@@ -132,6 +150,7 @@ public static partial class ReportCompiler
                     imageStyle.Append("width:").Append(Num(width)).Append("mm;");
                 if (image.HeightMm is decimal height)
                     imageStyle.Append("height:").Append(Num(height)).Append("mm;");
+                imageStyle.Append(BoxCss(image.Style));
                 if (imageStyle.Length > 0)
                     html.Append(" style=\"").Append(imageStyle).Append('"');
                 html.Append('>');
@@ -140,14 +159,18 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block spacer")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(spacer.Id))
-                    .Append("\" style=\"height:").Append(Num(spacer.HeightMm)).Append("mm\"></div>");
+                    .Append("\" style=\"height:").Append(Num(spacer.HeightMm)).Append("mm;")
+                    .Append(BoxCss(spacer.Style))
+                    .Append("\"></div>");
                 break;
             case ColumnsBlock columns:
                 html.Append("<div class=\"block cols cols-")
                     .Append(columns.Columns.Count.ToString(CultureInfo.InvariantCulture))
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(columns.Id))
-                    .Append("\">");
+                    .Append('"');
+                AppendStyleAttribute(html, BoxCss(columns.Style));
+                html.Append('>');
                 foreach (var column in columns.Columns)
                 {
                     html.Append("<div class=\"col\">");
@@ -228,6 +251,7 @@ public static partial class ReportCompiler
         html.Append('"');
         if (id is not null)
             html.Append(" data-id=\"").Append(Encode(id)).Append('"');
+        AppendStyleAttribute(html, TableCss(table.TableStyle) + BoxCss(table.Style));
         html.Append('>');
         html.Append("<colgroup>");
         foreach (var column in table.Columns)
@@ -246,7 +270,9 @@ public static partial class ReportCompiler
             {
                 html.Append("<tr class=\"group-head\"><th colspan=\"")
                     .Append(table.Columns.Count.ToString(CultureInfo.InvariantCulture))
-                    .Append("\">")
+                    .Append('"');
+                AppendStyleAttribute(html, CellCss(table.TableStyle, header: true));
+                html.Append('>')
                     .Append(Encode(groupTitle))
                     .Append("</th></tr>");
             }
@@ -255,8 +281,11 @@ public static partial class ReportCompiler
             {
                 html.Append("<tr>");
                 foreach (var column in table.Columns)
-                    html.Append("<th class=\"").Append(AlignClass(column.Align)).Append("\">")
-                        .Append(Encode(column.Header)).Append("</th>");
+                {
+                    html.Append("<th class=\"").Append(AlignClass(column.Align)).Append('"');
+                    AppendStyleAttribute(html, CellCss(table.TableStyle, header: true));
+                    html.Append('>').Append(Encode(column.Header)).Append("</th>");
+                }
 
                 html.Append("</tr>");
             }
@@ -286,22 +315,22 @@ public static partial class ReportCompiler
                         : "";
                 }
 
-                html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
-                    .Append(Encode(cell))
-                    .Append("</td>");
+                html.Append("<td class=\"").Append(AlignClass(column.Align)).Append('"');
+                AppendStyleAttribute(html, CellCss(table.TableStyle, header: false));
+                html.Append('>').Append(Encode(cell)).Append("</td>");
             }
 
             html.Append("</tr>");
         }
 
         if (table.GroupAggregates.Count > 0)
-            AppendAggregateRow(html, table.Columns, table.GroupAggregates, rows, options.Culture, "group-foot");
+            AppendAggregateRow(html, table.Columns, table.GroupAggregates, rows, options.Culture, "group-foot", table.TableStyle);
         html.Append("</tbody>");
 
         if (reportRows is not null && table.Aggregates.Count > 0)
         {
             html.Append("<tfoot>");
-            AppendAggregateRow(html, table.Columns, table.Aggregates, reportRows, options.Culture, null);
+            AppendAggregateRow(html, table.Columns, table.Aggregates, reportRows, options.Culture, null, table.TableStyle);
             html.Append("</tfoot>");
         }
 
@@ -362,7 +391,8 @@ public static partial class ReportCompiler
         List<TableAggregate> aggregates,
         List<JsonElement> rows,
         CultureInfo culture,
-        string? rowClass)
+        string? rowClass,
+        TableStyle? tableStyle)
     {
         html.Append("<tr");
         if (rowClass is not null)
@@ -375,9 +405,9 @@ public static partial class ReportCompiler
             var cell = aggregate is null
                 ? index == 0 ? aggregates[0].Label ?? "" : ""
                 : Aggregate(aggregate, rows, culture);
-            html.Append("<td class=\"").Append(AlignClass(column.Align)).Append("\">")
-                .Append(Encode(cell))
-                .Append("</td>");
+            html.Append("<td class=\"").Append(AlignClass(column.Align)).Append('"');
+            AppendStyleAttribute(html, CellCss(tableStyle, header: false));
+            html.Append('>').Append(Encode(cell)).Append("</td>");
         }
 
         html.Append("</tr>");
@@ -603,18 +633,6 @@ public static partial class ReportCompiler
         if (slot is not null && omitFirstPageNumber)
             rule.Append(" @page :first { @").Append(slot).Append(" { content: none; } }");
         return rule.ToString();
-    }
-
-    private static string StyleOf(decimal fontSizePt, bool bold, string? color, TextAlign align)
-    {
-        var css = new StringBuilder();
-        css.Append("font-size:").Append(Num(fontSizePt)).Append("pt;text-align:").Append(AlignCss(align)).Append(';');
-        if (bold)
-            css.Append("font-weight:700;");
-        if (StyleRules.IsHexColor(color))
-            css.Append("color:").Append(color).Append(';');
-        css.Append("white-space:pre-wrap;");
-        return css.ToString();
     }
 
     private static string AlignCss(TextAlign align) => align switch

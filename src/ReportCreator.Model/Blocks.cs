@@ -23,6 +23,8 @@ public enum AggregateKind
 [JsonDerivedType(typeof(SpacerBlock), "spacer")]
 [JsonDerivedType(typeof(ColumnsBlock), "columns")]
 [JsonDerivedType(typeof(TableBlock), "table")]
+[JsonDerivedType(typeof(RuleBlock), "rule")]
+[JsonDerivedType(typeof(PanelBlock), "panel")]
 public abstract class Block
 {
     public string Id { get; set; } = "";
@@ -34,6 +36,8 @@ public abstract class Block
     public bool PageBreakAfter { get; set; }
 
     public ShowWhen? When { get; set; }
+
+    public BoxStyle? Style { get; set; }
 }
 
 public sealed class TextBlock : Block
@@ -43,6 +47,14 @@ public sealed class TextBlock : Block
     public decimal FontSizePt { get; set; } = 11;
 
     public bool Bold { get; set; }
+
+    public bool Italic { get; set; }
+
+    public bool Underline { get; set; }
+
+    public string? FontFamily { get; set; }
+
+    public decimal? LineHeight { get; set; }
 
     public string? Color { get; set; }
 
@@ -59,9 +71,33 @@ public sealed class FieldBlock : Block
 
     public bool Bold { get; set; }
 
+    public bool Italic { get; set; }
+
+    public bool Underline { get; set; }
+
+    public string? FontFamily { get; set; }
+
+    public decimal? LineHeight { get; set; }
+
     public string? Color { get; set; }
 
     public TextAlign Align { get; set; } = TextAlign.Left;
+}
+
+public sealed class RuleBlock : Block
+{
+    public decimal ThicknessMm { get; set; } = 0.3m;
+
+    public string? Color { get; set; }
+
+    public decimal MarginTopMm { get; set; }
+
+    public decimal MarginBottomMm { get; set; }
+}
+
+public sealed class PanelBlock : Block
+{
+    public List<Block> Blocks { get; set; } = [];
 }
 
 public sealed class ImageBlock : Block
@@ -133,4 +169,6 @@ public sealed class TableBlock : Block
     public List<TableAggregate> Aggregates { get; set; } = [];
 
     public List<TableAggregate> GroupAggregates { get; set; } = [];
+
+    public TableStyle? TableStyle { get; set; }
 }

@@ -38,7 +38,7 @@ public class ReportTests
     {
         var report = new ReportDefinition
         {
-            SchemaVersion = 2,
+            SchemaVersion = 9,
             Name = "Bad",
             Page = new PageSetup
             {
@@ -584,6 +584,113 @@ public class ReportTests
         Assert.Contains("<th colspan=\"3\">Ada</th>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<th class=\"left\" style=\"width:", html, StringComparison.Ordinal);
         Assert.Equal(2, html.Split("<colgroup>", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void Styles_RoundTripAndPrintWithoutHostCss()
+    {
+        var definition = new ReportDefinition
+        {
+            Name = "Letter",
+            Body =
+            {
+                Blocks =
+                [
+                    new TextBlock
+                    {
+                        Id = "greeting",
+                        Text = "Dear customer,",
+                        FontFamily = "Times New Roman",
+                        FontSizePt = 12,
+                        Italic = true,
+                        Underline = true,
+                        LineHeight = 1.35m,
+                        Style = new BoxStyle
+                        {
+                            Margin = new Spacing { Top = 1, Bottom = 3 },
+                            Padding = new Spacing { Top = 1, Right = 2, Bottom = 1, Left = 2 }
+                        }
+                    },
+                    new RuleBlock { Id = "rule", ThicknessMm = 0.4m, Color = "#111827", MarginTopMm = 2, MarginBottomMm = 2 },
+                    new PanelBlock
+                    {
+                        Id = "notes",
+                        Style = new BoxStyle
+                        {
+                            Background = "#f8fafc",
+                            Padding = new Spacing { Top = 3, Right = 3, Bottom = 3, Left = 3 },
+                            Border = new BorderLine { WidthMm = 0.3m, Color = "#1f2937" }
+                        },
+                        Blocks =
+                        [
+                            new TextBlock { Id = "note", Text = "Packed with care.", FontFamily = "Segoe UI" }
+                        ]
+                    },
+                    new PanelBlock
+                    {
+                        Id = "terms",
+                        Style = new BoxStyle
+                        {
+                            Background = "#ffffff",
+                            Border = new BorderLine { WidthMm = 0.2m, Color = "#9ca3af", Top = true, Bottom = true }
+                        },
+                        Blocks = [new TextBlock { Id = "term", Text = "Payable in 30 days." }]
+                    },
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        TableStyle = new TableStyle
+                        {
+                            FontFamily = "Arial",
+                            FontSizePt = 10,
+                            Italic = true,
+                            CellPaddingMm = 2,
+                            BorderWidthMm = 0.2m,
+                            BorderColor = "#111827",
+                            HeaderBackground = "#e5e7eb"
+                        },
+                        Columns =
+                        [
+                            new TableColumn { Header = "Item", Path = "item" },
+                            new TableColumn { Header = "Qty", Path = "qty" }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new { lines = new[] { new { item = "Lamp", qty = 1 } } });
+        var saved = ReportJson.Write(definition);
+        var again = ReportJson.Read(saved);
+        var html = ReportCompiler.Compile(again, data);
+
+        Assert.Equal(ReportDefinition.CurrentSchemaVersion, again.SchemaVersion);
+        Assert.Equal("Times New Roman", ((TextBlock)again.Body.Blocks[0]).FontFamily);
+        Assert.True(((TextBlock)again.Body.Blocks[0]).Italic);
+        Assert.True(((TextBlock)again.Body.Blocks[0]).Underline);
+        Assert.Equal(1.35m, ((TextBlock)again.Body.Blocks[0]).LineHeight);
+        Assert.Equal(0.4m, ((RuleBlock)again.Body.Blocks[1]).ThicknessMm);
+        Assert.Equal("#f8fafc", ((PanelBlock)again.Body.Blocks[2]).Style!.Background);
+        Assert.Equal("#ffffff", ((PanelBlock)again.Body.Blocks[3]).Style!.Background);
+        Assert.True(((PanelBlock)again.Body.Blocks[3]).Style!.Border!.Top);
+        Assert.False(((PanelBlock)again.Body.Blocks[3]).Style!.Border!.Left);
+        Assert.Equal("Arial", ((TableBlock)again.Body.Blocks[4]).TableStyle!.FontFamily);
+        Assert.Contains("font-family:\"Times New Roman\", \"Source Sans 3\", serif", html, StringComparison.Ordinal);
+        Assert.Contains("font-style:italic", html, StringComparison.Ordinal);
+        Assert.Contains("text-decoration:underline", html, StringComparison.Ordinal);
+        Assert.Contains("line-height:1.35", html, StringComparison.Ordinal);
+        Assert.Contains("border-top:0.4mm solid #111827", html, StringComparison.Ordinal);
+        Assert.Contains("background:#f8fafc", html, StringComparison.Ordinal);
+        Assert.Contains("border:0.3mm solid #1f2937", html, StringComparison.Ordinal);
+        Assert.Contains("border-top:0.2mm solid #9ca3af", html, StringComparison.Ordinal);
+        Assert.Contains("border-bottom:0.2mm solid #9ca3af", html, StringComparison.Ordinal);
+        Assert.Contains("font-family:Arial, \"Source Sans 3\", sans-serif", html, StringComparison.Ordinal);
+        Assert.Contains("padding:2mm", html, StringComparison.Ordinal);
+        Assert.Contains("border:0.2mm solid #111827", html, StringComparison.Ordinal);
+        Assert.Contains("background:#e5e7eb", html, StringComparison.Ordinal);
+        Assert.Contains("Packed with care.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<style src=", html, StringComparison.Ordinal);
+        Assert.Equal(html, ReportCompiler.Compile(definition, data));
     }
 
     [Fact]
