@@ -169,7 +169,7 @@ public static partial class ReportCompiler
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(columns.Id))
                     .Append('"');
-                AppendStyleAttribute(html, BoxCss(columns.Style));
+                AppendStyleAttribute(html, ColumnGrid(columns) + BoxCss(columns.Style));
                 html.Append('>');
                 foreach (var column in columns.Columns)
                 {
@@ -586,9 +586,9 @@ public static partial class ReportCompiler
         tr.group-head { break-after: avoid; }
         tr.group-head th, tr.group-head td { font-weight: 700; background: #f9fafb; border-bottom: 0.3mm solid #111827; }
         tr.group-foot td { font-weight: 700; border-top: 0.2mm solid #9ca3af; }
-        .cols { display: grid; gap: 8mm; }
-        .cols-2 { grid-template-columns: 1fr 1fr; }
-        .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .cols { display: grid; gap: 8mm; align-items: start; }
+        .cols-2 { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+        .cols-3 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
         table { width: 100%; border-collapse: collapse; }
         thead { display: table-header-group; }
         th, td { padding: 1.5mm 2mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; }

@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.23. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.24. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,11 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.24 adds
+
+- A columns block has from one to eight columns. Each column sets a millimetre width or a weight. A column with neither shares the space that is left. One columns block may sit inside another. A third level is rejected.
+- The columns line up at the top, in the builder preview, the HTML, and the PDF.
 
 ## What 1.23 adds
 

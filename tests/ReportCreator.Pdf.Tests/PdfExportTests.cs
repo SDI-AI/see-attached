@@ -266,6 +266,59 @@ public partial class PdfExportTests
     }
 
     [Fact]
+    public async Task Export_PlacesFourColumnsByMillimetreAndLeavesTheRemainder()
+    {
+        var definition = new ReportDefinition
+        {
+            Name = "Columns",
+            Page = new PageSetup
+            {
+                Margin = new Margin { Top = 10, Right = 10, Bottom = 10, Left = 10 }
+            },
+            Body =
+            {
+                Blocks =
+                [
+                    new ColumnsBlock
+                    {
+                        Id = "quad",
+                        GapMm = 4,
+                        Columns =
+                        [
+                            new Column { WidthMm = 98, Blocks = [new TextBlock { Id = "a", Text = "SLOT-A" }] },
+                            new Column { WidthMm = 39, Blocks = [new TextBlock { Id = "b", Text = "SLOT-B" }] },
+                            new Column { WidthMm = 24, Blocks = [new TextBlock { Id = "c", Text = "SLOT-C" }] },
+                            new Column { Blocks = [new TextBlock { Id = "d", Text = "SLOT-D" }] }
+                        ]
+                    }
+                ]
+            }
+        };
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.InvariantCulture
+        });
+
+        var page = ExtractPlacedLines(await exporter.ExportAsync(definition, default, TestContext.Current.CancellationToken)).Single();
+        var a = page.Single(line => line.Text.Contains("SLOT-A", StringComparison.Ordinal));
+        var b = page.Single(line => line.Text.Contains("SLOT-B", StringComparison.Ordinal));
+        var c = page.Single(line => line.Text.Contains("SLOT-C", StringComparison.Ordinal));
+        var d = page.Single(line => line.Text.Contains("SLOT-D", StringComparison.Ordinal));
+        AssertNear(b.X, a.X + Mm(98 + 4));
+        AssertNear(c.X, b.X + Mm(39 + 4));
+        AssertNear(d.X, c.X + Mm(24 + 4));
+        Assert.True(d.X > c.X + Mm(20), "The last column should keep the space the fixed columns did not use.");
+        Assert.True(Math.Abs(a.Y - d.Y) < 4, "The four columns should stay on one row.");
+    }
+
+    private static void AssertNear(double actual, double expected)
+    {
+        Assert.InRange(actual, expected - 10, expected + 10);
+    }
+
+    private static double Mm(double millimetres) => millimetres * 72d / 25.4d;
+
+    [Fact]
     public async Task Export_HonorsColumnWidthsWithoutAHeaderAndUnderAGroupTitle()
     {
         var definition = new ReportDefinition

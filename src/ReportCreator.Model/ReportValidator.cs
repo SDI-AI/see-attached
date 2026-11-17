@@ -186,13 +186,19 @@ public static partial class ReportValidator
                 RequireMm(spacer.HeightMm, $"{where} spacer height", errors, positive: true);
                 break;
             case ColumnsBlock columns:
-                if (columnDepth >= 1)
+                if (columnDepth >= 2)
                     errors.Add($"{where} cannot contain another columns block.");
-                if (columns.Columns.Count is not 2 and not 3)
-                    errors.Add($"{where} must have two or three columns.");
+                if (columns.Columns.Count is < 1 or > 8)
+                    errors.Add($"{where} must have between one and eight columns.");
+                RequireMm(columns.GapMm, $"{where} column gap", errors, positive: false, allowNull: true);
                 foreach (var column in columns.Columns)
                 {
                     column.Blocks ??= [];
+                    RequireMm(column.WidthMm, $"{where} column width", errors, positive: true, allowNull: true);
+                    if (column.Weight is decimal weight && (weight <= 0 || weight > 100 || !StyleRules.HasAtMostTwoDecimalPlaces(weight)))
+                        errors.Add($"{where} column weight must be greater than zero.");
+                    if (column.WidthMm is not null && column.Weight is not null)
+                        errors.Add($"{where} column sets both a width and a weight.");
                     foreach (var child in column.Blocks)
                         ValidateBlock(child, scope, errors, ids, parameters, columnDepth + 1, panelDepth);
                 }

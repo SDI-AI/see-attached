@@ -61,7 +61,21 @@ public class ReportTests
                                     new ColumnsBlock
                                     {
                                         Id = "inner",
-                                        Columns = [new Column(), new Column()]
+                                        Columns =
+                                        [
+                                            new Column
+                                            {
+                                                Blocks =
+                                                [
+                                                    new ColumnsBlock
+                                                    {
+                                                        Id = "deeper",
+                                                        Columns = [new Column(), new Column()]
+                                                    }
+                                                ]
+                                            },
+                                            new Column()
+                                        ]
                                     }
                                 ]
                             },
@@ -584,6 +598,139 @@ public class ReportTests
         Assert.Contains("<th colspan=\"3\">Ada</th>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<th class=\"left\" style=\"width:", html, StringComparison.Ordinal);
         Assert.Equal(2, html.Split("<colgroup>", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void Columns_UseWidthsWeightsAndIndependentLists()
+    {
+        var definition = new ReportDefinition
+        {
+            Page = new PageSetup { Margin = new Margin { Top = 10, Right = 10, Bottom = 10, Left = 10 } },
+            Body =
+            {
+                Blocks =
+                [
+                    new ColumnsBlock
+                    {
+                        Id = "quad",
+                        GapMm = 4,
+                        Columns =
+                        [
+                            new Column
+                            {
+                                WidthMm = 98,
+                                Blocks =
+                                [
+                                    new TextBlock { Id = "h1", Text = "COL-1" },
+                                    new TableBlock
+                                    {
+                                        Id = "t1",
+                                        DataPath = "notes",
+                                        ShowHeader = false,
+                                        Columns = [new TableColumn { Header = "Text", Path = "text" }]
+                                    }
+                                ]
+                            },
+                            new Column
+                            {
+                                WidthMm = 39,
+                                Blocks =
+                                [
+                                    new TextBlock { Id = "h2", Text = "COL-2" },
+                                    new TableBlock
+                                    {
+                                        Id = "t2",
+                                        DataPath = "parts",
+                                        ShowHeader = false,
+                                        Columns = [new TableColumn { Header = "Sku", Path = "sku" }]
+                                    }
+                                ]
+                            },
+                            new Column
+                            {
+                                WidthMm = 24,
+                                Blocks = [new TextBlock { Id = "h3", Text = "COL-3" }]
+                            },
+                            new Column
+                            {
+                                Blocks =
+                                [
+                                    new TextBlock { Id = "h4", Text = "COL-4" },
+                                    new ColumnsBlock
+                                    {
+                                        Id = "nested",
+                                        Columns =
+                                        [
+                                            new Column { Weight = 2, Blocks = [new TextBlock { Id = "n1", Text = "NEST-A" }] },
+                                            new Column { Weight = 1, Blocks = [new TextBlock { Id = "n2", Text = "NEST-B" }] }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            notes = new[] { new { text = "Note one" }, new { text = "Note two" }, new { text = "Note three" } },
+            parts = new[] { new { sku = "Part one" } }
+        });
+
+        var html = ReportCompiler.Compile(definition, data);
+        var again = ReportJson.Read(ReportJson.Write(definition));
+
+        Assert.Contains("grid-template-columns:98mm 39mm 24mm minmax(0,1fr);align-items:start;gap:4mm;", html, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns:2fr 1fr;align-items:start;", html, StringComparison.Ordinal);
+        Assert.Contains("COL-1", html, StringComparison.Ordinal);
+        Assert.Contains("Note three", html, StringComparison.Ordinal);
+        Assert.Contains("Part one", html, StringComparison.Ordinal);
+        Assert.Equal(3, html.Split(">Note ", StringSplitOptions.None).Length - 1);
+        Assert.Equal(1, html.Split(">Part ", StringSplitOptions.None).Length - 1);
+        Assert.Equal(98m, ((ColumnsBlock)again.Body.Blocks[0]).Columns[0].WidthMm);
+        Assert.Null(((ColumnsBlock)again.Body.Blocks[0]).Columns[3].WidthMm);
+        Assert.Empty(ReportValidator.Validate(definition));
+
+        var tooDeep = ReportValidator.Validate(new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new ColumnsBlock
+                    {
+                        Id = "a",
+                        Columns =
+                        [
+                            new Column
+                            {
+                                Blocks =
+                                [
+                                    new ColumnsBlock
+                                    {
+                                        Id = "b",
+                                        Columns =
+                                        [
+                                            new Column
+                                            {
+                                                Blocks =
+                                                [
+                                                    new ColumnsBlock { Id = "c", Columns = [new Column(), new Column()] }
+                                                ]
+                                            },
+                                            new Column()
+                                        ]
+                                    }
+                                ]
+                            },
+                            new Column()
+                        ]
+                    }
+                ]
+            }
+        });
+        Assert.Contains(tooDeep, error => error.Contains("another columns block", StringComparison.Ordinal));
     }
 
     [Fact]

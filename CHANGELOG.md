@@ -1,6 +1,10 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, and 1.23. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, and 1.24. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.24
+
+- Columns take a millimetre width or a weight, from one column up to eight. The unset column uses the remaining width. A columns block can contain one more columns block.
 
 ## 1.23
 

@@ -119,11 +119,17 @@ public sealed class SpacerBlock : Block
 public sealed class Column
 {
     public List<Block> Blocks { get; set; } = [];
+
+    public decimal? WidthMm { get; set; }
+
+    public decimal? Weight { get; set; }
 }
 
 public sealed class ColumnsBlock : Block
 {
     public List<Column> Columns { get; set; } = [];
+
+    public decimal? GapMm { get; set; }
 }
 
 public sealed class TableColumn
