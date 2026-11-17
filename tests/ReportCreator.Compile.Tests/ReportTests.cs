@@ -234,12 +234,17 @@ public class ReportTests
         var html = ReportCompiler.Compile(definition, default);
 
         Assert.Contains("class=\"page-chrome page-header\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"page-chrome page-footer\"", html, StringComparison.Ordinal);
+        Assert.Contains("table-header-group", html, StringComparison.Ordinal);
+        Assert.Contains("table-footer-group", html, StringComparison.Ordinal);
         Assert.Contains(">Acme<", html, StringComparison.Ordinal);
         Assert.Contains(">File copy<", html, StringComparison.Ordinal);
-        Assert.Contains("position: fixed", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("position: fixed", html, StringComparison.Ordinal);
         Assert.Contains("counter(page)", html, StringComparison.Ordinal);
         Assert.Contains("counter(pages)", html, StringComparison.Ordinal);
-        Assert.Contains("margin: 24mm 12mm 28mm 12mm;", html, StringComparison.Ordinal);
+        Assert.Contains("margin: 12mm 12mm 18mm 12mm;", html, StringComparison.Ordinal);
+        Assert.Contains("style=\"height:12mm\"", html, StringComparison.Ordinal);
+        Assert.Contains("style=\"height:10mm\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("@page :first", html, StringComparison.Ordinal);
     }
 
@@ -500,6 +505,85 @@ public class ReportTests
         Assert.Contains("<tr class=\"group-head\"><th colspan=\"2\">Bea</th></tr><tr><th class=\"left\">Customer</th>", html, StringComparison.Ordinal);
         Assert.Equal(1, html.Split(">Total<", StringSplitOptions.None).Length - 1);
         Assert.Contains(">3.00<", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Table_WidthsApplyWithoutAHeader()
+    {
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        ShowHeader = false,
+                        Columns =
+                        [
+                            new TableColumn { Header = "Description", Path = "description", WidthMm = 80 },
+                            new TableColumn { Header = "Amount", Path = "amount", WidthMm = 30, Align = TextAlign.Right }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            lines = new[] { new { description = "Widget", amount = 12 } }
+        });
+
+        var html = ReportCompiler.Compile(definition, data);
+
+        Assert.Contains("<colgroup><col style=\"width:80mm\"><col style=\"width:30mm\"></colgroup>", html, StringComparison.Ordinal);
+        Assert.Contains("table-layout: fixed", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"block layout-fixed\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<th", html, StringComparison.Ordinal);
+        Assert.Contains(">Widget<", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Table_GroupedWidthsUseTheColumnGroup()
+    {
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "lines",
+                        DataPath = "lines",
+                        GroupBy = "customer",
+                        Columns =
+                        [
+                            new TableColumn { Header = "Customer", Path = "customer", WidthMm = 40 },
+                            new TableColumn { Header = "Note", Path = "note", WidthMm = 70 },
+                            new TableColumn { Header = "Amount", Path = "amount", WidthMm = 25, Align = TextAlign.Right }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            lines = new[]
+            {
+                new { customer = "Ada", note = "First", amount = 1 },
+                new { customer = "Bea", note = "Second", amount = 2 }
+            }
+        });
+
+        var html = ReportCompiler.Compile(definition, data, new CompileOptions { Culture = CultureInfo.InvariantCulture });
+
+        Assert.Contains("<colgroup><col style=\"width:40mm\"><col style=\"width:70mm\"><col style=\"width:25mm\"></colgroup>", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"group layout-fixed\"", html, StringComparison.Ordinal);
+        Assert.Contains("<th colspan=\"3\">Ada</th>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<th class=\"left\" style=\"width:", html, StringComparison.Ordinal);
+        Assert.Equal(2, html.Split("<colgroup>", StringSplitOptions.None).Length - 1);
     }
 
     [Fact]

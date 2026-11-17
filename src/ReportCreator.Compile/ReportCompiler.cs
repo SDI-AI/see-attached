@@ -36,27 +36,43 @@ public static partial class ReportCompiler
             .Append(Encode(definition.Name))
             .Append("</title><style>")
             .Append(FontFaces.Value)
-            .Append(SheetCss(size, margin, headerMm, footerMm, numberMm, definition.Page.PageNumbers, definition.Page.OmitPageNumberOnFirstPage))
+            .Append(SheetCss(size, margin, numberMm, definition.Page.PageNumbers, definition.Page.OmitPageNumberOnFirstPage))
             .Append("</style></head><body");
         if (options.DesignMode)
             html.Append(" class=\"design\"");
         html.Append("><article class=\"sheet\" data-rc=\"1\">");
-        if (headerMm > 0)
+        // Chromium positions fixed elements inside the page area. A positive
+        // bottom offset then sits on top of the body, because @page has already
+        // reserved the footer band. A header and footer group take that space
+        // in the table flow, so the body stops above the footer on every page.
+        var framed = headerMm > 0 || footerMm > 0;
+        if (framed)
         {
-            html.Append("<header class=\"page-chrome page-header\">");
-            RenderBand(html, definition.PageHeader, definition, data, options);
-            html.Append("</header>");
+            html.Append("<table class=\"page-frame\">");
+            if (headerMm > 0)
+            {
+                html.Append("<thead><tr><td><div class=\"page-chrome page-header\" style=\"height:")
+                    .Append(Num(headerMm)).Append("mm\">");
+                RenderBand(html, definition.PageHeader, definition, data, options);
+                html.Append("</div></td></tr></thead>");
+            }
+
+            if (footerMm > 0)
+            {
+                html.Append("<tfoot><tr><td><div class=\"page-chrome page-footer\" style=\"height:")
+                    .Append(Num(footerMm)).Append("mm\">");
+                RenderBand(html, definition.PageFooter, definition, data, options);
+                html.Append("</div></td></tr></tfoot>");
+            }
+
+            html.Append("<tbody><tr><td>");
         }
 
         RenderBand(html, definition.Header, definition, data, options);
         RenderBand(html, definition.Body, definition, data, options);
         RenderBand(html, definition.Footer, definition, data, options);
-        if (footerMm > 0)
-        {
-            html.Append("<footer class=\"page-chrome page-footer\">");
-            RenderBand(html, definition.PageFooter, definition, data, options);
-            html.Append("</footer>");
-        }
+        if (framed)
+            html.Append("</td></tr></tbody></table>");
 
         html.Append("</article>");
         if (options.DesignMode)
@@ -205,10 +221,24 @@ public static partial class ReportCompiler
         string? id,
         string? groupTitle)
     {
-        html.Append("<table class=\"").Append(className).Append('"');
+        var fixedLayout = table.Columns.Exists(column => column.WidthMm is > 0);
+        html.Append("<table class=\"").Append(className);
+        if (fixedLayout)
+            html.Append(" layout-fixed");
+        html.Append('"');
         if (id is not null)
             html.Append(" data-id=\"").Append(Encode(id)).Append('"');
         html.Append('>');
+        html.Append("<colgroup>");
+        foreach (var column in table.Columns)
+        {
+            html.Append("<col");
+            if (column.WidthMm is decimal width)
+                html.Append(" style=\"width:").Append(Num(width)).Append("mm\"");
+            html.Append('>');
+        }
+
+        html.Append("</colgroup>");
         if (groupTitle is not null || table.ShowHeader)
         {
             html.Append("<thead>");
@@ -225,12 +255,8 @@ public static partial class ReportCompiler
             {
                 html.Append("<tr>");
                 foreach (var column in table.Columns)
-                {
-                    html.Append("<th class=\"").Append(AlignClass(column.Align)).Append('"');
-                    if (column.WidthMm is decimal width)
-                        html.Append(" style=\"width:").Append(Num(width)).Append("mm\"");
-                    html.Append('>').Append(Encode(column.Header)).Append("</th>");
-                }
+                    html.Append("<th class=\"").Append(AlignClass(column.Align)).Append("\">")
+                        .Append(Encode(column.Header)).Append("</th>");
 
                 html.Append("</tr>");
             }
@@ -492,7 +518,7 @@ public static partial class ReportCompiler
         }
     }
 
-    private static string SheetCss(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber) =>
+    private static string SheetCss(PageSize size, Margin margin, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber) =>
         $$"""
         html, body { margin: 0; padding: 0; }
         body {
@@ -516,6 +542,13 @@ public static partial class ReportCompiler
         .block { margin: 0 0 2mm; }
         .block:last-child { margin-bottom: 0; }
         .keep, tr { break-inside: avoid; page-break-inside: avoid; }
+        table.page-frame { width: 100%; border-collapse: collapse; }
+        table.page-frame > thead { display: table-header-group; }
+        table.page-frame > tfoot { display: table-footer-group; }
+        table.page-frame > thead > tr > td, table.page-frame > tfoot > tr > td, table.page-frame > tbody > tr > td { padding: 0; border: 0; background: none; vertical-align: top; }
+        table.page-frame > tbody > tr { break-inside: auto; page-break-inside: auto; }
+        .page-chrome { overflow: hidden; }
+        table.layout-fixed { table-layout: fixed; }
         .break-before { break-before: page; page-break-before: always; }
         .break-after { break-after: page; page-break-after: always; }
         .group-wrap { margin: 0 0 4mm; }
@@ -537,19 +570,18 @@ public static partial class ReportCompiler
         .rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
         body.design .block { cursor: pointer; outline: 1px solid #d1d5db; }
         body.design .block.rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
-        {{PageRule(size, margin, headerMm, footerMm, numberMm, numbers, omitFirstPageNumber)}}
+        {{PageRule(size, margin, numberMm, numbers, omitFirstPageNumber)}}
         @media print {
           body { background: #fff; }
           .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
           .rc-selected, body.design .block { outline: none; }
-          {{FixedChrome(margin, headerMm, footerMm, numberMm)}}
         }
         """;
 
-    private static string PageRule(PageSize size, Margin margin, decimal headerMm, decimal footerMm, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber)
+    private static string PageRule(PageSize size, Margin margin, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber)
     {
-        var top = margin.Top + headerMm;
-        var bottom = margin.Bottom + footerMm + numberMm;
+        var top = margin.Top;
+        var bottom = margin.Bottom + numberMm;
         var rule = new StringBuilder();
         rule.Append("@page { size: ").Append(Num(size.WidthMm)).Append("mm ").Append(Num(size.HeightMm))
             .Append("mm; margin: ").Append(Num(top)).Append("mm ").Append(Num(margin.Right))
@@ -564,36 +596,13 @@ public static partial class ReportCompiler
         if (slot is not null)
         {
             rule.Append(" @").Append(slot)
-                .Append(" { content: \"Page \" counter(page) \" of \" counter(pages); font-family: \"Source Sans 3\", sans-serif; font-size: 9pt; color: #6b7280;");
-            if (footerMm > 0)
-                rule.Append(" margin-top: ").Append(Num(footerMm)).Append("mm;");
-            rule.Append(" }");
+                .Append(" { content: \"Page \" counter(page) \" of \" counter(pages); font-family: \"Source Sans 3\", sans-serif; font-size: 9pt; color: #6b7280; }");
         }
 
         rule.Append(" }");
         if (slot is not null && omitFirstPageNumber)
             rule.Append(" @page :first { @").Append(slot).Append(" { content: none; } }");
         return rule.ToString();
-    }
-
-    private static string FixedChrome(Margin margin, decimal headerMm, decimal footerMm, decimal numberMm)
-    {
-        var css = new StringBuilder();
-        if (headerMm > 0)
-        {
-            css.Append(".page-header { position: fixed; overflow: hidden; top: ").Append(Num(margin.Top))
-                .Append("mm; left: ").Append(Num(margin.Left)).Append("mm; right: ").Append(Num(margin.Right))
-                .Append("mm; height: ").Append(Num(headerMm)).Append("mm; }");
-        }
-
-        if (footerMm > 0)
-        {
-            css.Append(".page-footer { position: fixed; overflow: hidden; bottom: ").Append(Num(margin.Bottom + numberMm))
-                .Append("mm; left: ").Append(Num(margin.Left)).Append("mm; right: ").Append(Num(margin.Right))
-                .Append("mm; height: ").Append(Num(footerMm)).Append("mm; }");
-        }
-
-        return css.ToString();
     }
 
     private static string StyleOf(decimal fontSizePt, bool bold, string? color, TextAlign align)

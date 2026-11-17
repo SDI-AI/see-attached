@@ -8,7 +8,7 @@ using ReportCreator.Pdf;
 
 namespace ReportCreator.Pdf.Tests;
 
-public class PdfExportTests
+public partial class PdfExportTests
 {
     [Fact]
     public async Task Export_UsesThePaperSizeAndContainsTheInvoiceText()
@@ -214,6 +214,126 @@ public class PdfExportTests
         var kept = pages.Single(page => page.Contains("ROW-KEEP-TOGETHER", StringComparison.Ordinal));
         Assert.Contains("4242", kept, StringComparison.Ordinal);
         Assert.Contains("GROUP-LONG", kept, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Export_KeepsTheFooterAndPageNumberClearOfTheBody()
+    {
+        var blocks = new List<Block>();
+        for (var index = 1; index <= 46; index++)
+        {
+            blocks.Add(new TextBlock
+            {
+                Id = "line" + index.ToString(CultureInfo.InvariantCulture),
+                Text = "BODY-" + index.ToString("00", CultureInfo.InvariantCulture) + " near the printable edge"
+            });
+        }
+
+        var definition = new ReportDefinition
+        {
+            Name = "Edge",
+            Page = new PageSetup
+            {
+                PageNumbers = PageNumberPlacement.BottomCenter,
+                PageHeaderMm = 12,
+                PageFooterMm = 10
+            },
+            PageHeader = { Blocks = [new TextBlock { Id = "running", Text = "HEADER-MARK" }] },
+            PageFooter = { Blocks = [new TextBlock { Id = "copy", Text = "FOOTER-MARK" }] },
+            Body = { Blocks = blocks }
+        };
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.InvariantCulture
+        });
+
+        var pages = ExtractPlacedLines(await exporter.ExportAsync(definition, default, TestContext.Current.CancellationToken));
+
+        Assert.True(pages.Count >= 2, "Expected the body to reach a second page, got " + pages.Count + ".");
+        foreach (var page in pages)
+        {
+            var header = page.Single(line => line.Text.Contains("HEADER-MARK", StringComparison.Ordinal));
+            var footer = page.Single(line => line.Text.Contains("FOOTER-MARK", StringComparison.Ordinal));
+            var number = page.Single(line => line.Text.StartsWith("Page", StringComparison.Ordinal));
+            var body = page.Where(line => line.Text.Contains("BODY-", StringComparison.Ordinal)).ToList();
+            Assert.NotEmpty(body);
+            var highestBody = body.Max(line => line.Y);
+            var lowestBody = body.Min(line => line.Y);
+            Assert.True(header.Y > highestBody + 8, "Header overlaps the body at " + header.Y.ToString("0.0", CultureInfo.InvariantCulture) + " / " + highestBody.ToString("0.0", CultureInfo.InvariantCulture));
+            Assert.True(lowestBody > footer.Y + 8, "Footer overlaps the body at " + footer.Y.ToString("0.0", CultureInfo.InvariantCulture) + " / " + lowestBody.ToString("0.0", CultureInfo.InvariantCulture));
+            Assert.True(footer.Y > number.Y + 4, "Page number overlaps the footer at " + number.Y.ToString("0.0", CultureInfo.InvariantCulture) + " / " + footer.Y.ToString("0.0", CultureInfo.InvariantCulture));
+        }
+    }
+
+    [Fact]
+    public async Task Export_HonorsColumnWidthsWithoutAHeaderAndUnderAGroupTitle()
+    {
+        var definition = new ReportDefinition
+        {
+            Name = "Widths",
+            Page = new PageSetup
+            {
+                Margin = new Margin { Top = 12, Right = 12, Bottom = 12, Left = 12 }
+            },
+            Body =
+            {
+                Blocks =
+                [
+                    new TableBlock
+                    {
+                        Id = "plain",
+                        DataPath = "lines",
+                        ShowHeader = false,
+                        Columns =
+                        [
+                            new TableColumn { Header = "A", Path = "a", WidthMm = 100 },
+                            new TableColumn { Header = "B", Path = "b", WidthMm = 30 },
+                            new TableColumn { Header = "C", Path = "c", WidthMm = 24 }
+                        ]
+                    },
+                    new TableBlock
+                    {
+                        Id = "grouped",
+                        DataPath = "grouped",
+                        GroupBy = "bucket",
+                        Columns =
+                        [
+                            new TableColumn { Header = "Bucket", Path = "bucket", WidthMm = 90 },
+                            new TableColumn { Header = "Note", Path = "note", WidthMm = 36 },
+                            new TableColumn { Header = "Tag", Path = "tag", WidthMm = 24 }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            lines = new[] { new { a = "COL-A", b = "COL-B", c = "COL-C" } },
+            grouped = new[] { new { bucket = "Group One", note = "COL-G", tag = "COL-H" } }
+        });
+        await using var exporter = await ReportPdfExporter.LaunchAsync(new PdfExportOptions
+        {
+            Culture = CultureInfo.InvariantCulture
+        });
+
+        var page = ExtractPlacedLines(await exporter.ExportAsync(definition, data, TestContext.Current.CancellationToken)).Single();
+        var plainA = page.Single(line => line.Text.Contains("COL-A", StringComparison.Ordinal));
+        var plainB = page.Single(line => line.Text.Contains("COL-B", StringComparison.Ordinal));
+        var plainC = page.Single(line => line.Text.Contains("COL-C", StringComparison.Ordinal));
+        AssertColumnRatio(plainB.X - plainA.X, plainC.X - plainB.X, 100d / 30d);
+
+        var groupB = page.Single(line => line.Text.Contains("COL-G", StringComparison.Ordinal));
+        var groupC = page.Single(line => line.Text.Contains("COL-H", StringComparison.Ordinal));
+        var groupA = page.Where(line => line.Text.Contains("Group", StringComparison.Ordinal) && Math.Abs(line.Y - groupB.Y) < 2)
+            .OrderBy(line => line.X)
+            .First();
+        AssertColumnRatio(groupB.X - groupA.X, groupC.X - groupB.X, 90d / 36d);
+    }
+
+    private static void AssertColumnRatio(double leftSpan, double rightSpan, double expected)
+    {
+        var ratio = leftSpan / rightSpan;
+        Assert.InRange(ratio, expected - 0.35, expected + 0.35);
     }
 
     private static string Fixture(string name) =>
@@ -516,6 +636,153 @@ public class PdfExportTests
             }
         }
     }
+
+    private sealed record PlacedLine(string Text, double X, double Y);
+
+    private readonly record struct PdfMatrix(double A, double B, double C, double D, double E, double F)
+    {
+        public static PdfMatrix Identity => new(1, 0, 0, 1, 0, 0);
+
+        public PdfMatrix Then(PdfMatrix next) => new(
+            next.A * A + next.B * C,
+            next.A * B + next.B * D,
+            next.C * A + next.D * C,
+            next.C * B + next.D * D,
+            next.E * A + next.F * C + E,
+            next.E * B + next.F * D + F);
+
+        public (double X, double Y) Apply(double x, double y) => (A * x + C * y + E, B * x + D * y + F);
+    }
+
+    private static List<List<PlacedLine>> ExtractPlacedLines(byte[] pdf)
+    {
+        var objects = ReadObjects(pdf);
+        var pages = new List<List<PlacedLine>>();
+        foreach (var page in OrderedPages(objects))
+        {
+            var fonts = FontMaps(objects, ResourceBody(objects, page.Body));
+            var glyphs = new List<(string Text, double X, double Y)>();
+            var ctm = PdfMatrix.Identity;
+            var textMatrix = PdfMatrix.Identity;
+            GlyphMap? current = null;
+            var stack = new Stack<PdfMatrix>();
+            foreach (var contentId in ContentIds(page.Body))
+            {
+                if (!objects.TryGetValue(contentId, out var content) || content.Data is null)
+                    continue;
+
+                var source = Encoding.Latin1.GetString(content.Data);
+                foreach (Match token in PositionToken().Matches(source))
+                {
+                    if (token.Value == "q")
+                    {
+                        stack.Push(ctm);
+                        continue;
+                    }
+
+                    if (token.Value == "Q")
+                    {
+                        ctm = stack.Count > 0 ? stack.Pop() : ctm;
+                        continue;
+                    }
+
+                    if (token.Groups["op"].Success)
+                    {
+                        var matrix = new PdfMatrix(
+                            ParsePdf(token.Groups["a"].Value),
+                            ParsePdf(token.Groups["b"].Value),
+                            ParsePdf(token.Groups["c"].Value),
+                            ParsePdf(token.Groups["d"].Value),
+                            ParsePdf(token.Groups["e"].Value),
+                            ParsePdf(token.Groups["f"].Value));
+                        if (token.Groups["op"].Value == "cm")
+                            ctm = ctm.Then(matrix);
+                        else
+                            textMatrix = matrix;
+                        continue;
+                    }
+
+                    if (token.Groups["dx"].Success)
+                    {
+                        var dx = ParsePdf(token.Groups["dx"].Value);
+                        var dy = ParsePdf(token.Groups["dy"].Value);
+                        textMatrix = new PdfMatrix(
+                            textMatrix.A,
+                            textMatrix.B,
+                            textMatrix.C,
+                            textMatrix.D,
+                            textMatrix.A * dx + textMatrix.C * dy + textMatrix.E,
+                            textMatrix.B * dx + textMatrix.D * dy + textMatrix.F);
+                        continue;
+                    }
+
+                    if (token.Groups["font"].Success)
+                    {
+                        fonts.TryGetValue(token.Groups["font"].Value, out current);
+                        continue;
+                    }
+
+                    if (current is null || !token.Groups["hex"].Success)
+                        continue;
+
+                    var origin = ctm.Then(textMatrix).Apply(0, 0);
+                    var hex = token.Groups["hex"].Value;
+                    var width = current.HexWidth;
+                    var text = new StringBuilder();
+                    for (var index = 0; index + width <= hex.Length; index += width)
+                    {
+                        var glyph = Convert.ToInt32(hex.Substring(index, width), 16);
+                        if (current.Characters.TryGetValue(glyph, out var characters))
+                            text.Append(characters);
+                    }
+
+                    if (text.Length > 0)
+                        glyphs.Add((text.ToString(), origin.X, origin.Y));
+                }
+            }
+
+            pages.Add(GroupWords(glyphs));
+        }
+
+        return pages;
+    }
+
+    private static List<PlacedLine> GroupWords(List<(string Text, double X, double Y)> glyphs)
+    {
+        var words = new List<PlacedLine>();
+        var buffer = new StringBuilder();
+        double startX = 0;
+        double y = 0;
+        double previousX = 0;
+        var open = false;
+        foreach (var glyph in glyphs)
+        {
+            var sameLine = open && Math.Abs(glyph.Y - y) < 1.2;
+            var closeEnough = open && glyph.X - previousX < 16;
+            if (!sameLine || !closeEnough)
+            {
+                if (open && buffer.Length > 0)
+                    words.Add(new PlacedLine(buffer.ToString(), startX, y));
+                buffer.Clear();
+                startX = glyph.X;
+                y = glyph.Y;
+                open = true;
+            }
+
+            buffer.Append(glyph.Text);
+            previousX = glyph.X;
+        }
+
+        if (open && buffer.Length > 0)
+            words.Add(new PlacedLine(buffer.ToString(), startX, y));
+        return words;
+    }
+
+    private static double ParsePdf(string value) =>
+        double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
+
+    [GeneratedRegex(@"q(?![A-Za-z])|Q(?![A-Za-z])|(?<a>-?[0-9.]+) (?<b>-?[0-9.]+) (?<c>-?[0-9.]+) (?<d>-?[0-9.]+) (?<e>-?[0-9.]+) (?<f>-?[0-9.]+) (?<op>cm|Tm)|(?<dx>-?[0-9.]+) (?<dy>-?[0-9.]+) Td|/(?<font>[A-Za-z][A-Za-z0-9]*)\s+[0-9.]+\s+Tf|<(?<hex>[0-9A-Fa-f]+)>\s*Tj")]
+    private static partial Regex PositionToken();
 
     private static int IndexOf(byte[] buffer, ReadOnlySpan<byte> pattern, int start)
     {
