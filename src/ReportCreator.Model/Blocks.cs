@@ -9,6 +9,12 @@ public enum TextAlign
     Right
 }
 
+public enum ImageFit
+{
+    None,
+    Contain
+}
+
 public enum AggregateKind
 {
     Sum,
@@ -57,9 +63,30 @@ public sealed class TextBlock : Block
 
     public decimal? LineHeight { get; set; }
 
+    public decimal? SpaceBeforeMm { get; set; }
+
+    public decimal? SpaceAfterMm { get; set; }
+
+    public List<TextRun>? Runs { get; set; }
+
     public string? Color { get; set; }
 
     public TextAlign Align { get; set; } = TextAlign.Left;
+}
+
+public sealed class TextRun
+{
+    public string Text { get; set; } = "";
+
+    public string? Path { get; set; }
+
+    public string? Format { get; set; }
+
+    public bool Bold { get; set; }
+
+    public bool Italic { get; set; }
+
+    public bool Underline { get; set; }
 }
 
 public sealed class FieldBlock : Block
@@ -116,11 +143,17 @@ public sealed class ImageBlock : Block
 {
     public string Source { get; set; } = "";
 
+    public string? SourcePath { get; set; }
+
     public decimal? WidthMm { get; set; }
 
     public decimal? HeightMm { get; set; }
 
     public string Alt { get; set; } = "";
+
+    public ImageFit Fit { get; set; } = ImageFit.None;
+
+    public TextAlign Align { get; set; } = TextAlign.Left;
 }
 
 public sealed class SpacerBlock : Block

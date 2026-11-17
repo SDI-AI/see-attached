@@ -601,6 +601,102 @@ public class ReportTests
     }
 
     [Fact]
+    public void ImagesAndRuns_BindPerRecordAndStayStructured()
+    {
+        const string red = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4IScHAAK2AQU0pnWqAAAAAElFTkSuQmCC";
+        const string blue = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQCzgBAAHGATfKMLLEAAAAAElFTkSuQmCC";
+        var definition = new ReportDefinition
+        {
+            Body =
+            {
+                Blocks =
+                [
+                    new ImageBlock
+                    {
+                        Id = "logo",
+                        Source = red,
+                        Alt = "Literal mark",
+                        WidthMm = 12,
+                        HeightMm = 12,
+                        Fit = ImageFit.Contain,
+                        Align = TextAlign.Center
+                    },
+                    new ImageBlock
+                    {
+                        Id = "secret",
+                        SourcePath = "hiddenPhoto",
+                        Alt = "Hidden photo",
+                        When = new ShowWhen { Path = "showHidden", Kind = ShowWhenKind.NotEmpty }
+                    },
+                    new RepeatBlock
+                    {
+                        Id = "cards",
+                        DataPath = "cards",
+                        Blocks =
+                        [
+                            new ImageBlock
+                            {
+                                Id = "photo",
+                                SourcePath = "item.photo",
+                                Alt = "Record photo",
+                                WidthMm = 16,
+                                HeightMm = 16,
+                                Fit = ImageFit.Contain,
+                                Align = TextAlign.Left
+                            },
+                            new TextBlock
+                            {
+                                Id = "letter",
+                                SpaceBeforeMm = 2,
+                                SpaceAfterMm = 3,
+                                Runs =
+                                [
+                                    new TextRun { Text = "Hello " },
+                                    new TextRun { Path = "item.name", Bold = true, Italic = true },
+                                    new TextRun { Text = " <note>", Underline = true }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            hiddenPhoto = blue,
+            showHidden = "",
+            cards = new object[]
+            {
+                new { name = "Ada", photo = red },
+                new { name = "Bea", photo = blue },
+                new { name = "Cy", photo = "" }
+            }
+        });
+
+        var html = ReportCompiler.Compile(definition, data);
+        var again = ReportJson.Read(ReportJson.Write(definition));
+
+        Assert.Contains("alt=\"Literal mark\"", html, StringComparison.Ordinal);
+        Assert.Contains("object-fit:contain", html, StringComparison.Ordinal);
+        Assert.Contains("margin-left:auto;margin-right:auto", html, StringComparison.Ordinal);
+        Assert.Equal(2, Count(html, red));
+        Assert.Equal(1, Count(html, blue));
+        Assert.DoesNotContain("Hidden photo", html, StringComparison.Ordinal);
+        Assert.Equal(3, Count(html, "<img"));
+        Assert.DoesNotContain("src=\"\"", html, StringComparison.Ordinal);
+        Assert.Contains("<span>Hello </span>", html, StringComparison.Ordinal);
+        Assert.Contains("<span style=\"font-weight:700;font-style:italic;\">Ada</span>", html, StringComparison.Ordinal);
+        Assert.Contains("<span style=\"font-weight:700;font-style:italic;\">Bea</span>", html, StringComparison.Ordinal);
+        Assert.Contains("&lt;note&gt;", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<note>", html, StringComparison.Ordinal);
+        Assert.Contains("margin-top:2mm;", html, StringComparison.Ordinal);
+        Assert.Contains("margin-bottom:3mm;", html, StringComparison.Ordinal);
+        Assert.Equal(ImageFit.Contain, ((ImageBlock)again.Body.Blocks[0]).Fit);
+        Assert.Equal("item.photo", ((ImageBlock)((RepeatBlock)again.Body.Blocks[2]).Blocks[0]).SourcePath);
+        Assert.Equal(3, ((TextBlock)((RepeatBlock)again.Body.Blocks[2]).Blocks[1]).Runs!.Count);
+    }
+
+    [Fact]
     public void Repeat_KeepsDistinctChildrenAndIndependentLists()
     {
         var definition = OrdersReport();
@@ -1048,6 +1144,29 @@ public class ReportTests
         }
     });
 
+    [Fact]
+    public void OrdersSample_CompilesTheNestedLayout()
+    {
+        var definition = ReportJson.Read(File.ReadAllText(Fixture("orders", "definition.json")));
+        var data = ReportJson.ReadData(File.ReadAllText(Fixture("orders", "data.json")));
+        var html = ReportCompiler.Compile(definition, data, new CompileOptions
+        {
+            Culture = Us,
+            Clock = new DateTimeOffset(2026, 4, 2, 9, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.Contains("SO-100", html, StringComparison.Ordinal);
+        Assert.Contains("SO-200", html, StringComparison.Ordinal);
+        Assert.Contains("Standard kit", html, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns:70mm 32mm 28mm minmax(0,1fr)", html, StringComparison.Ordinal);
+        Assert.Contains("font-family:\"Times New Roman\"", html, StringComparison.Ordinal);
+        Assert.Contains("Prepared for ", html, StringComparison.Ordinal);
+        Assert.Contains("Order SO-100", html, StringComparison.Ordinal);
+        Assert.Equal(1, Count(html, "Order SO-100"));
+        Assert.Contains("Pack the lamp first.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string CompileInvoice() =>
         ReportCompiler.Compile(ReadInvoice(), ReadInvoiceData(), new CompileOptions { Culture = Us });
 
@@ -1059,4 +1178,7 @@ public class ReportTests
 
     private static string Fixture(string name) =>
         Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice", name);
+
+    private static string Fixture(string folder, string name) =>
+        Path.Combine(AppContext.BaseDirectory, "fixtures", folder, name);
 }

@@ -1,0 +1,85 @@
+{
+  "company": "Northwind Traders",
+  "prepared": "2026-04-02",
+  "orders": [
+    {
+      "id": "SO-100",
+      "customer": "Ada Lovelace",
+      "lines": [
+        {
+          "id": "L-1",
+          "title": "Standard kit",
+          "notes": [
+            { "text": "Pack the lamp first." },
+            { "text": "Include the spare fuse." }
+          ],
+          "parts": [
+            { "sku": "LAMP-1" }
+          ],
+          "tasks": [],
+          "charges": [
+            { "name": "Freight" },
+            { "name": "Wrap" },
+            { "name": "Rush" }
+          ]
+        },
+        {
+          "id": "L-2",
+          "title": "Standard kit",
+          "notes": [
+            { "text": "Leave the cable coiled." }
+          ],
+          "parts": [
+            { "sku": "CORD-2" },
+            { "sku": "PLUG-3" }
+          ],
+          "tasks": [
+            { "name": "Inspect" },
+            { "name": "Label" }
+          ],
+          "charges": [
+            { "name": "Freight" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SO-200",
+      "customer": "Grace Hopper",
+      "lines": [
+        {
+          "id": "L-3",
+          "title": "Standard kit",
+          "notes": [
+            { "text": "Confirm the desk size." }
+          ],
+          "parts": [
+            { "sku": "DESK-4" }
+          ],
+          "tasks": [
+            { "name": "Schedule" }
+          ],
+          "charges": [
+            { "name": "Install" }
+          ]
+        },
+        {
+          "id": "L-4",
+          "title": "Standard kit",
+          "notes": [
+            { "text": "Call before delivery." },
+            { "text": "Use the side door." }
+          ],
+          "parts": [],
+          "tasks": [
+            { "name": "Confirm" }
+          ],
+          "charges": [
+            { "name": "Freight" },
+            { "name": "Wait" }
+          ]
+        }
+      ]
+    }
+  ]
+}

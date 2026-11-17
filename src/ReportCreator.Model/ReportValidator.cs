@@ -151,6 +151,24 @@ public static partial class ReportValidator
                     CheckParameter(match.Groups[1].Value, where, parameters, errors);
                 ValidateStyle(where, text.FontSizePt, text.Color, errors);
                 ValidateFont(where, text.FontFamily, text.LineHeight, errors);
+                RequireMm(text.SpaceBeforeMm, $"{where} space before", errors, positive: false, allowNull: true);
+                RequireMm(text.SpaceAfterMm, $"{where} space after", errors, positive: false, allowNull: true);
+                if (text.Runs is { Count: > 0 })
+                {
+                    if (text.Runs.Count > 40)
+                        errors.Add($"{where} has too many text runs.");
+                    foreach (var run in text.Runs)
+                    {
+                        if ((run.Text ?? "").Length > 4_000)
+                            errors.Add($"{where} has a text run that is too long.");
+                        if (!string.IsNullOrWhiteSpace(run.Path) && !StyleRules.IsBindingPath(run.Path))
+                            errors.Add($"{where} has a text run with a bad binding path.");
+                        CheckParameter(run.Path, where, parameters, errors);
+                        ValidateFormat(where, run.Format, errors);
+                        foreach (Match match in Token().Matches(run.Text ?? ""))
+                            CheckParameter(match.Groups[1].Value, where, parameters, errors);
+                    }
+                }
                 break;
             case FieldBlock field:
                 if (!StyleRules.IsBindingPath(field.Path))
@@ -184,8 +202,18 @@ public static partial class ReportValidator
                     ValidateBlock(child, scope, errors, ids, parameters, columnDepth, panelDepth, repeatDepth + 1);
                 break;
             case ImageBlock image:
-                if (!ImageSources.IsAllowed(image.Source))
+                var bound = !string.IsNullOrWhiteSpace(image.SourcePath);
+                if (bound && !StyleRules.IsBindingPath(image.SourcePath))
+                    errors.Add($"{where} image source path must look like item.logo.");
+                CheckParameter(image.SourcePath, where, parameters, errors);
+                if (!string.IsNullOrWhiteSpace(image.Source) && !ImageSources.IsAllowed(image.Source))
                     errors.Add($"{where} image source must be an https URL or a png, jpeg, gif, or webp data URI.");
+                else if (!bound && !ImageSources.IsAllowed(image.Source))
+                    errors.Add($"{where} image source must be an https URL or a png, jpeg, gif, or webp data URI.");
+                if (!Enum.IsDefined(image.Fit))
+                    errors.Add($"{where} image fit is not recognized.");
+                if (!Enum.IsDefined(image.Align))
+                    errors.Add($"{where} image alignment is not recognized.");
                 RequireMm(image.WidthMm, $"{where} image width", errors, positive: true, allowNull: true);
                 RequireMm(image.HeightMm, $"{where} image height", errors, positive: true, allowNull: true);
                 if (image.Alt.Length > 200)

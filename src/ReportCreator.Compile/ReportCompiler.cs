@@ -105,10 +105,16 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(text.Id))
-                    .Append("\" style=\"").Append(TextStyle(text.FontSizePt, text.Bold, text.Italic, text.Underline, text.FontFamily, text.LineHeight, text.Color, text.Align, text.Style))
-                    .Append("\">")
-                    .Append(Expand(text.Text, definition, scope, options))
-                    .Append("</div>");
+                    .Append("\" style=\"").Append(TextStyle(text))
+                    .Append("\">");
+                if (text.Runs is { Count: > 0 })
+                {
+                    foreach (var run in text.Runs)
+                        AppendRun(html, run, definition, scope, options);
+                }
+                else
+                    html.Append(Expand(text.Text, definition, scope, options));
+                html.Append("</div>");
                 break;
             case FieldBlock field:
                 var fieldText = ResolveText(field.Path, field.Format, definition, scope, options);
@@ -139,18 +145,25 @@ public static partial class ReportCompiler
                 html.Append("</div>");
                 break;
             case ImageBlock image:
+                var source = ImageSource(image, scope);
+                if (!ImageSources.IsAllowed(source))
+                    break;
                 html.Append("<img class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(image.Id))
                     .Append("\" alt=\"").Append(Encode(image.Alt))
-                    .Append('"');
-                if (ImageSources.IsAllowed(image.Source))
-                    html.Append(" src=\"").Append(Encode(image.Source)).Append('"');
+                    .Append("\" src=\"").Append(Encode(source)).Append('"');
                 var imageStyle = new StringBuilder();
                 if (image.WidthMm is decimal width)
                     imageStyle.Append("width:").Append(Num(width)).Append("mm;");
                 if (image.HeightMm is decimal height)
                     imageStyle.Append("height:").Append(Num(height)).Append("mm;");
+                if (image.Fit == ImageFit.Contain)
+                    imageStyle.Append("object-fit:contain;object-position:").Append(AlignCss(image.Align)).Append(';');
+                if (image.Align == TextAlign.Center)
+                    imageStyle.Append("margin-left:auto;margin-right:auto;");
+                else if (image.Align == TextAlign.Right)
+                    imageStyle.Append("margin-left:auto;");
                 imageStyle.Append(BoxCss(image.Style));
                 if (imageStyle.Length > 0)
                     html.Append(" style=\"").Append(imageStyle).Append('"');

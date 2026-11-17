@@ -36,6 +36,9 @@ internal static class PropertyEditor
             case ModelText text:
                 AddText(panel, "Text", text.Text, value => text.Text = value, preview, multiline: true);
                 AddStyle(panel, text, preview);
+                AddOptionalMm(panel, "Space before mm", text.SpaceBeforeMm, value => text.SpaceBeforeMm = value, preview);
+                AddOptionalMm(panel, "Space after mm", text.SpaceAfterMm, value => text.SpaceAfterMm = value, preview);
+                AddRuns(panel, text, preview, rebuild);
                 break;
             case FieldBlock field:
                 AddText(panel, "Path", field.Path, value => field.Path = value, preview, multiline: false);
@@ -76,7 +79,20 @@ internal static class PropertyEditor
                 break;
             case ImageBlock image:
                 AddText(panel, "Source", image.Source, value => image.Source = value, preview, multiline: true);
+                AddText(panel, "Source path", image.SourcePath ?? "", value => image.SourcePath = Blank(value), preview, multiline: false);
                 AddText(panel, "Alt", image.Alt, value => image.Alt = value, preview, multiline: false);
+                AddAlign(panel, image.Align, value => image.Align = value, preview);
+                var fit = new ComboBox { ItemsSource = Enum.GetValues<ImageFit>(), SelectedItem = image.Fit };
+                Use(fit, "FieldCombo");
+                fit.SelectionChanged += (_, _) =>
+                {
+                    if (fit.SelectedItem is ImageFit value)
+                    {
+                        image.Fit = value;
+                        preview();
+                    }
+                };
+                panel.Children.Add(fit);
                 AddOptionalMm(panel, "Width mm", image.WidthMm, value => image.WidthMm = value, preview);
                 AddOptionalMm(panel, "Height mm", image.HeightMm, value => image.HeightMm = value, preview);
                 break;
@@ -143,6 +159,49 @@ internal static class PropertyEditor
             preview();
         };
         panel.Children.Add(button);
+    }
+
+    private static void AddRuns(StackPanel panel, ModelText text, Action preview, Action rebuild)
+    {
+        text.Runs ??= [];
+        AddLabel(panel, "Runs");
+        foreach (var run in text.Runs.ToList())
+        {
+            AddText(panel, "Run text", run.Text, value => run.Text = value, preview, multiline: false);
+            AddText(panel, "Run path", run.Path ?? "", value => run.Path = Blank(value), preview, multiline: false);
+            AddCheck(panel, "Run bold", run.Bold, value =>
+            {
+                run.Bold = value;
+                preview();
+            });
+            AddCheck(panel, "Run italic", run.Italic, value =>
+            {
+                run.Italic = value;
+                preview();
+            });
+            AddCheck(panel, "Run underline", run.Underline, value =>
+            {
+                run.Underline = value;
+                preview();
+            });
+            var remove = Quiet("Remove run");
+            remove.Click += (_, _) =>
+            {
+                text.Runs.Remove(run);
+                rebuild();
+                preview();
+            };
+            panel.Children.Add(remove);
+        }
+
+        var add = Quiet("Add run");
+        add.Click += (_, _) =>
+        {
+            text.Runs.Add(new TextRun { Text = "Text" });
+            rebuild();
+            preview();
+        };
+        panel.Children.Add(add);
     }
 
     private static void AddPanelTools(StackPanel panel, PanelBlock container, Action preview, Action rebuild)

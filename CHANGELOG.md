@@ -1,6 +1,12 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, and 1.25. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, and 1.26. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.26
+
+- An image `sourcePath` reads a PNG, JPEG, GIF, or WebP data URI from the record. `fit: contain` keeps the aspect ratio. A missing or hidden image is left out.
+- Text runs carry bold, italic, and underline, and can bind a value. They are not raw HTML.
+- Schema version 4 is current. Versions 1 through 3 still compile.
 
 ## 1.25
 

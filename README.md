@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.25. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.26. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,12 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.26 adds
+
+- An image can bind `sourcePath` to a PNG or JPEG data URI on the current record. A literal `source` still works. `fit` can be `contain`, which keeps the aspect ratio. A missing value draws nothing, and a hidden image stays hidden.
+- A text block can hold runs. Each run is bold, italic, or underline, and can bind a path. The runs are structured text, not HTML. Space before and space after set the paragraph gap.
+- Report schema version 4 is current. Version 1, 2, and 3 files still open.
 
 ## What 1.25 adds
 
@@ -80,7 +86,7 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 
 ## Not in this version
 
-Charts, barcodes, rich text, expressions, right-to-left layout, and a free canvas.
+Charts, barcodes, a formula language, raw HTML in text, right-to-left layout, and a free canvas.
 
 ## Projects
 
@@ -95,6 +101,7 @@ Charts, barcodes, rich text, expressions, right-to-left layout, and a free canva
 | `samples/viewer-next` | Next.js host for the same HTML |
 | `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` |
 | `fixtures/invoice` | Invoice definition and data |
+| `fixtures/orders` | Nested repeats, four columns, and styled panels |
 | `tests/ReportCreator.Compile.Tests` | HTML checks, no browser |
 | `tests/ReportCreator.Pdf.Tests` | Page size, text, and a table that crosses pages |
 | `Dockerfile` | Blazor sample image with Chromium installed |
