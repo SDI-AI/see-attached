@@ -1,6 +1,11 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, and 1.26. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, and 1.26.1. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.26.1
+
+- Style attributes are HTML-encoded. A font stack such as `Arial, "Source Sans 3", sans-serif` no longer ends the attribute early and drops the CSS that follows. This covers the shared style writer and the text, field, rule, image, and spacer blocks.
+- The repeating page footer is normal weight. The table-total rule still bolds an aggregate row, and it no longer bolds or clips the page footer.
 
 ## 1.26
 

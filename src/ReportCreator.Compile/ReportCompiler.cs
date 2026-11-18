@@ -105,7 +105,7 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(text.Id))
-                    .Append("\" style=\"").Append(TextStyle(text))
+                    .Append("\" style=\"").Append(Encode(TextStyle(text)))
                     .Append("\">");
                 if (text.Runs is { Count: > 0 })
                 {
@@ -121,7 +121,7 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(field.Id))
-                    .Append("\" style=\"").Append(TextStyle(field.FontSizePt, field.Bold, field.Italic, field.Underline, field.FontFamily, field.LineHeight, field.Color, field.Align, field.Style))
+                    .Append("\" style=\"").Append(Encode(TextStyle(field.FontSizePt, field.Bold, field.Italic, field.Underline, field.FontFamily, field.LineHeight, field.Color, field.Align, field.Style)))
                     .Append("\">")
                     .Append(Encode(fieldText))
                     .Append("</div>");
@@ -130,7 +130,7 @@ public static partial class ReportCompiler
                 html.Append("<div class=\"block rule")
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(rule.Id))
-                    .Append("\" style=\"").Append(RuleStyle(rule))
+                    .Append("\" style=\"").Append(Encode(RuleStyle(rule)))
                     .Append("\"></div>");
                 break;
             case PanelBlock panel:
@@ -166,7 +166,7 @@ public static partial class ReportCompiler
                     imageStyle.Append("margin-left:auto;");
                 imageStyle.Append(BoxCss(image.Style));
                 if (imageStyle.Length > 0)
-                    html.Append(" style=\"").Append(imageStyle).Append('"');
+                    html.Append(" style=\"").Append(Encode(imageStyle.ToString())).Append('"');
                 html.Append('>');
                 break;
             case SpacerBlock spacer:
@@ -174,7 +174,7 @@ public static partial class ReportCompiler
                     .Append(flags)
                     .Append("\" data-id=\"").Append(Encode(spacer.Id))
                     .Append("\" style=\"height:").Append(Num(spacer.HeightMm)).Append("mm;")
-                    .Append(BoxCss(spacer.Style))
+                    .Append(Encode(BoxCss(spacer.Style)))
                     .Append("\"></div>");
                 break;
             case ColumnsBlock columns:
@@ -635,6 +635,7 @@ public static partial class ReportCompiler
         table.page-frame > thead { display: table-header-group; }
         table.page-frame > tfoot { display: table-footer-group; }
         table.page-frame > thead > tr > td, table.page-frame > tfoot > tr > td, table.page-frame > tbody > tr > td { padding: 0; border: 0; background: none; vertical-align: top; }
+        table.page-frame > tfoot > tr > td { font-weight: normal; }
         table.page-frame > tbody > tr { break-inside: auto; page-break-inside: auto; }
         .page-chrome { overflow: hidden; }
         table.layout-fixed { table-layout: fixed; }
