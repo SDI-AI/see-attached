@@ -41,7 +41,12 @@ public static partial class ReportCompiler
             .Append("</style></head><body");
         if (options.DesignMode)
             html.Append(" class=\"design\"");
-        html.Append("><article class=\"sheet\" data-rc=\"1\">");
+        html.Append('>');
+        // Fixed, so it repeats on every printed page and adds no flow height.
+        // Rotation stays on the inner element: a transform on the fixed box
+        // itself paints on the first page only.
+        AppendWatermark(html, definition.Page.Watermark);
+        html.Append("<article class=\"sheet\" data-rc=\"1\">");
         // Chromium positions fixed elements inside the page area. A positive
         // bottom offset then sits on top of the body, because @page has already
         // reserved the footer band. A header and footer group take that space
@@ -620,6 +625,8 @@ public static partial class ReportCompiler
           print-color-adjust: exact;
         }
         .sheet {
+          position: relative;
+          z-index: 1;
           box-sizing: border-box;
           width: {{Num(size.WidthMm)}}mm;
           min-height: {{Num(size.HeightMm)}}mm;
@@ -628,6 +635,17 @@ public static partial class ReportCompiler
           background: #fff;
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
         }
+        .page-watermark {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
+          box-sizing: border-box;
+          padding: 6mm;
+        }
+        .page-watermark-text, .page-watermark img { flex: 0 0 auto; }
         .block { margin: 0 0 2mm; }
         .block:last-child { margin-bottom: 0; }
         .keep, tr { break-inside: avoid; page-break-inside: avoid; }
@@ -664,11 +682,83 @@ public static partial class ReportCompiler
         body.design .block.rc-selected { outline: 0.6mm solid #2563eb; outline-offset: 0.4mm; }
         {{PageRule(size, margin, numberMm, numbers, omitFirstPageNumber)}}
         @media print {
-          body { background: #fff; }
-          .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+          html { background: #fff; }
+          body { background: transparent; }
+          .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; background: transparent; }
           .rc-selected, body.design .block { outline: none; }
         }
         """;
+
+    private static void AppendWatermark(StringBuilder html, PageWatermark? watermark)
+    {
+        if (watermark is not { Enabled: true })
+            return;
+
+        var text = watermark.Kind == WatermarkKind.Text;
+        if (text && string.IsNullOrWhiteSpace(watermark.Text))
+            return;
+        if (!text && !ImageSources.IsAllowed(watermark.Source))
+            return;
+
+        var justify = watermark.Horizontal switch
+        {
+            WatermarkHorizontal.Left => "flex-start",
+            WatermarkHorizontal.Right => "flex-end",
+            _ => "center"
+        };
+        var align = watermark.Vertical switch
+        {
+            WatermarkVertical.Top => "flex-start",
+            WatermarkVertical.Bottom => "flex-end",
+            _ => "center"
+        };
+        html.Append("<div class=\"page-watermark\" aria-hidden=\"true\" style=\"")
+            .Append(Encode("justify-content:" + justify + ";align-items:" + align + ";"))
+            .Append("\">");
+
+        var item = new StringBuilder();
+        if (text)
+        {
+            var color = StyleRules.IsHexColor(watermark.Color) ? watermark.Color! : "#C0C0C0";
+            item.Append("font-family:").Append(StyleRules.FontStack(watermark.FontFamily)).Append(';');
+            item.Append("font-size:").Append(Num(watermark.FontSizePt)).Append("pt;");
+            item.Append("font-weight:400;line-height:1;white-space:nowrap;color:").Append(color).Append(';');
+        }
+        else
+        {
+            if (watermark.WidthMm is decimal width)
+                item.Append("width:").Append(Num(width)).Append("mm;");
+            if (watermark.HeightMm is decimal height)
+                item.Append("height:").Append(Num(height)).Append("mm;");
+            if (watermark.WidthMm is null && watermark.HeightMm is null)
+                item.Append("max-width:70%;max-height:70%;");
+            item.Append("object-fit:contain;");
+        }
+
+        if (watermark.Opacity is decimal opacity)
+            item.Append("opacity:").Append(Num(opacity)).Append(';');
+        if (watermark.RotationDegrees != 0)
+            item.Append("transform:rotate(").Append(Num(watermark.RotationDegrees)).Append("deg);");
+
+        if (text)
+        {
+            html.Append("<div class=\"page-watermark-text\" style=\"")
+                .Append(Encode(item.ToString()))
+                .Append("\">")
+                .Append(Encode(watermark.Text.Trim()))
+                .Append("</div>");
+        }
+        else
+        {
+            html.Append("<img class=\"page-watermark-image\" alt=\"\" src=\"")
+                .Append(Encode(watermark.Source))
+                .Append("\" style=\"")
+                .Append(Encode(item.ToString()))
+                .Append("\">");
+        }
+
+        html.Append("</div>");
+    }
 
     private static string PageRule(PageSize size, Margin margin, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber)
     {

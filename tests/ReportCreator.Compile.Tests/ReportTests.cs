@@ -253,7 +253,9 @@ public class ReportTests
         Assert.Contains("table-footer-group", html, StringComparison.Ordinal);
         Assert.Contains(">Acme<", html, StringComparison.Ordinal);
         Assert.Contains(">File copy<", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("position: fixed", html, StringComparison.Ordinal);
+        Assert.Contains(".page-chrome { overflow: hidden; }", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("page-chrome { position: fixed", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"page-watermark\"", html, StringComparison.Ordinal);
         Assert.Contains("counter(page)", html, StringComparison.Ordinal);
         Assert.Contains("counter(pages)", html, StringComparison.Ordinal);
         Assert.Contains("margin: 12mm 12mm 18mm 12mm;", html, StringComparison.Ordinal);

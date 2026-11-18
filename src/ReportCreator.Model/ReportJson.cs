@@ -40,8 +40,14 @@ public static class ReportJson
         }
     }
 
-    public static string Write(ReportDefinition definition) =>
-        JsonSerializer.Serialize(definition, Options);
+    public static string Write(ReportDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        // A watermark is a version 5 feature. Older files that gain one record that when they are saved.
+        if (definition.Page?.Watermark is not null && definition.SchemaVersion < ReportDefinition.CurrentSchemaVersion)
+            definition.SchemaVersion = ReportDefinition.CurrentSchemaVersion;
+        return JsonSerializer.Serialize(definition, Options);
+    }
 
     public static ReportDefinition Read(string json) =>
         JsonSerializer.Deserialize<ReportDefinition>(json, Options)

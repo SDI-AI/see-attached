@@ -4,7 +4,7 @@ namespace ReportCreator.Model;
 
 public sealed class ReportDefinition
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public const int MinimumSchemaVersion = 1;
 
@@ -48,6 +48,9 @@ public sealed class PageSetup
     // Leaves the page-number margin box off page 1. The repeating page header still prints there.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool OmitPageNumberOnFirstPage { get; set; }
+
+    // Printed behind the body on every page. Null leaves the page unchanged.
+    public PageWatermark? Watermark { get; set; }
 }
 
 public sealed class Margin
