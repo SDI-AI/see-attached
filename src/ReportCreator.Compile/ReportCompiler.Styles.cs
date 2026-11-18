@@ -202,6 +202,6 @@ public static partial class ReportCompiler
     {
         if (css.Length == 0)
             return;
-        html.Append(" style=\"").Append(css).Append('"');
+        html.Append(" style=\"").Append(Encode(css)).Append('"');
     }
 }
