@@ -987,7 +987,7 @@ public class ReportTests
         Assert.True(((PanelBlock)again.Body.Blocks[3]).Style!.Border!.Top);
         Assert.False(((PanelBlock)again.Body.Blocks[3]).Style!.Border!.Left);
         Assert.Equal("Arial", ((TableBlock)again.Body.Blocks[4]).TableStyle!.FontFamily);
-        Assert.Contains("font-family:\"Times New Roman\", \"Source Sans 3\", serif", html, StringComparison.Ordinal);
+        Assert.Contains("font-family:&quot;Times New Roman&quot;, &quot;Source Sans 3&quot;, serif", html, StringComparison.Ordinal);
         Assert.Contains("font-style:italic", html, StringComparison.Ordinal);
         Assert.Contains("text-decoration:underline", html, StringComparison.Ordinal);
         Assert.Contains("line-height:1.35", html, StringComparison.Ordinal);
@@ -996,7 +996,7 @@ public class ReportTests
         Assert.Contains("border:0.3mm solid #1f2937", html, StringComparison.Ordinal);
         Assert.Contains("border-top:0.2mm solid #9ca3af", html, StringComparison.Ordinal);
         Assert.Contains("border-bottom:0.2mm solid #9ca3af", html, StringComparison.Ordinal);
-        Assert.Contains("font-family:Arial, \"Source Sans 3\", sans-serif", html, StringComparison.Ordinal);
+        Assert.Contains("font-family:Arial, &quot;Source Sans 3&quot;, sans-serif", html, StringComparison.Ordinal);
         Assert.Contains("padding:2mm", html, StringComparison.Ordinal);
         Assert.Contains("border:0.2mm solid #111827", html, StringComparison.Ordinal);
         Assert.Contains("background:#e5e7eb", html, StringComparison.Ordinal);
@@ -1161,7 +1161,7 @@ public class ReportTests
         Assert.Contains("SO-200", html, StringComparison.Ordinal);
         Assert.Contains("Standard kit", html, StringComparison.Ordinal);
         Assert.Contains("grid-template-columns:70mm 32mm 28mm minmax(0,1fr)", html, StringComparison.Ordinal);
-        Assert.Contains("font-family:\"Times New Roman\"", html, StringComparison.Ordinal);
+        Assert.Contains("font-family:&quot;Times New Roman&quot;", html, StringComparison.Ordinal);
         Assert.Contains("Prepared for ", html, StringComparison.Ordinal);
         Assert.Contains("Order SO-100", html, StringComparison.Ordinal);
         Assert.Equal(1, Count(html, "Order SO-100"));

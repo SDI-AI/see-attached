@@ -56,6 +56,11 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - The builder sets it in Page setup. The preview and the PDF export use the same HTML, so the mark matches. The on-screen HTML viewers pin a fixed layer to the window; they do not paginate.
 - Report schema version 5 is current. Version 1, 2, 3, and 4 files still open. A file gains version 5 when it is saved with a watermark. `fixtures/watermark` is a sample.
 
+## What 1.26.1 adds
+
+- A quoted font stack stays inside its style attribute. The compiler HTML-encodes style attributes, so later declarations such as padding and background are not dropped.
+- The repeating page footer prints at normal weight. Table aggregate totals stay bold.
+
 ## What 1.26 adds
 
 - An image can bind `sourcePath` to a PNG or JPEG data URI on the current record. A literal `source` still works. `fit` can be `contain`, which keeps the aspect ratio. A missing value draws nothing, and a hidden image stays hidden.
