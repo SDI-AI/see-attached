@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.26. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.27.0. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,12 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.27 adds
+
+- A page watermark prints behind the body on every page. It is there for migrating Crystal Reports underlay watermarks. The mark is text or an image, with horizontal and vertical alignment, a font size from 6 to 120 points, a color, an opacity from 0 to 1, and a rotation. It is not part of the flow, so page breaks, page counts, and page numbers stay where they were. Body text is still capped at 96 points.
+- The builder sets it in Page setup. The preview and the PDF export use the same HTML, so the mark matches. The on-screen HTML viewers pin a fixed layer to the window; they do not paginate.
+- Report schema version 5 is current. Version 1, 2, 3, and 4 files still open. A file gains version 5 when it is saved with a watermark. `fixtures/watermark` is a sample.
 
 ## What 1.26 adds
 
@@ -102,6 +108,7 @@ Charts, barcodes, a formula language, raw HTML in text, right-to-left layout, an
 | `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` and `orders.html` |
 | `fixtures/invoice` | Invoice definition and data |
 | `fixtures/orders` | Nested repeats, four columns, and styled panels |
+| `fixtures/watermark` | A page watermark on a multi-page notice |
 | `tests/ReportCreator.Compile.Tests` | HTML checks, no browser |
 | `tests/ReportCreator.Pdf.Tests` | Page size, text, and a table that crosses pages |
 | `Dockerfile` | Blazor sample image with Chromium installed |

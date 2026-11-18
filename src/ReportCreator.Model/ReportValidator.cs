@@ -72,6 +72,8 @@ public static partial class ReportValidator
         RequireMm(page.PageFooterMm, "Page footer height", errors, positive: false);
         if (!Enum.IsDefined(page.PageNumbers))
             errors.Add("The page number placement is not recognized.");
+        if (page.Watermark is not null)
+            ValidateWatermark(page.Watermark, errors);
 
         if (page.Paper == PaperKind.Custom && (page.CustomWidthMm is null or <= 0 || page.CustomHeightMm is null or <= 0))
             return;
@@ -280,6 +282,41 @@ public static partial class ReportValidator
     {
         if (PrintPaths.TryParameterName(path, out var name) && !parameters.Contains(name))
             errors.Add($"{where} refers to parameter '{name}', which is not declared.");
+    }
+
+    private static void ValidateWatermark(PageWatermark watermark, List<string> errors)
+    {
+        if (!Enum.IsDefined(watermark.Kind))
+            errors.Add("The watermark kind is not recognized.");
+        if (!Enum.IsDefined(watermark.Horizontal))
+            errors.Add("The watermark alignment is not recognized.");
+        if (!Enum.IsDefined(watermark.Vertical))
+            errors.Add("The watermark position is not recognized.");
+        if (watermark.FontSizePt is < 6 or > PageWatermark.MaxFontSizePt || !StyleRules.HasAtMostTwoDecimalPlaces(watermark.FontSizePt))
+            errors.Add($"Watermark font size must be between 6 and {PageWatermark.MaxFontSizePt:0} points.");
+        if (watermark.Color is not null && !StyleRules.IsHexColor(watermark.Color))
+            errors.Add("Watermark color must be a #RGB or #RRGGBB value.");
+        if (watermark.FontFamily is not null && !StyleRules.IsFontFamily(watermark.FontFamily))
+            errors.Add("Watermark font must be Source Sans 3, Arial, Segoe UI, Times New Roman, Georgia, or Courier New.");
+        if (watermark.Opacity is decimal opacity && (opacity < 0 || opacity > 1 || !StyleRules.HasAtMostTwoDecimalPlaces(opacity)))
+            errors.Add("Watermark opacity must be between 0 and 1.");
+        if (watermark.RotationDegrees is < -180 or > 180 || !StyleRules.HasAtMostTwoDecimalPlaces(watermark.RotationDegrees))
+            errors.Add("Watermark rotation must be between -180 and 180 degrees.");
+        if (watermark.Text.Contains('\r') || watermark.Text.Contains('\n'))
+            errors.Add("Watermark text must be one line.");
+        else if (watermark.Text.Length > 80)
+            errors.Add("Watermark text must be 80 characters or fewer.");
+        else if (watermark.Enabled && watermark.Kind == WatermarkKind.Text && string.IsNullOrWhiteSpace(watermark.Text))
+            errors.Add("Watermark text is required.");
+
+        var sourceSet = !string.IsNullOrWhiteSpace(watermark.Source);
+        if (watermark.Kind == WatermarkKind.Image && watermark.Enabled && !ImageSources.IsAllowed(watermark.Source))
+            errors.Add("Watermark image source must be an https URL or a png, jpeg, gif, or webp data URI.");
+        else if (sourceSet && !ImageSources.IsAllowed(watermark.Source))
+            errors.Add("Watermark image source must be an https URL or a png, jpeg, gif, or webp data URI.");
+
+        RequireMm(watermark.WidthMm, "Watermark image width", errors, positive: true, allowNull: true);
+        RequireMm(watermark.HeightMm, "Watermark image height", errors, positive: true, allowNull: true);
     }
 
     private static void ValidateStyle(string where, decimal fontSizePt, string? color, List<string> errors)

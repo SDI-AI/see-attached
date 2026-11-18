@@ -1,6 +1,12 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, and 1.26. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, and 1.27. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.27.0
+
+- A page can carry a watermark, text or an image, for migrating Crystal Reports underlay watermarks. It repeats behind the body on every printed page. Alignment, font size up to 120 pt, color, opacity, and rotation are saved with the page. It takes no flow height, so page breaks and page numbers stay the same. Leave it off and an older report is unchanged.
+- Schema version 5 is current. Versions 1 through 4 still compile. Saving a report that has a watermark writes version 5.
+- `fixtures/watermark` is a sample notice with a centered grey DRAFT mark.
 
 ## 1.26
 

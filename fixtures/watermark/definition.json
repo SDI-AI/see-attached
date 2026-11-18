@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 5,
+  "name": "Sample notice",
+  "page": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": {
+      "top": 14,
+      "right": 14,
+      "bottom": 14,
+      "left": 14
+    },
+    "pageHeaderMm": 12,
+    "pageFooterMm": 10,
+    "pageNumbers": "bottomCenter",
+    "watermark": {
+      "enabled": true,
+      "kind": "text",
+      "text": "DRAFT",
+      "fontFamily": "Segoe UI",
+      "fontSizePt": 120,
+      "color": "#C0C0C0",
+      "horizontal": "center",
+      "vertical": "center"
+    }
+  },
+  "pageHeader": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "running",
+        "text": "Running sample",
+        "bold": true,
+        "fontSizePt": 12
+      }
+    ]
+  },
+  "pageFooter": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "copy",
+        "text": "Example copy",
+        "fontSizePt": 9,
+        "color": "#6b7280"
+      }
+    ]
+  },
+  "body": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "title",
+        "text": "Notice {notice.number}",
+        "bold": true,
+        "fontSizePt": 22
+      },
+      {
+        "type": "text",
+        "id": "meta",
+        "text": "{notice.date:MMMM d, yyyy}"
+      },
+      {
+        "type": "text",
+        "id": "intro",
+        "text": "This notice lists example lines. The watermark sits behind the text on every page and does not change the page breaks."
+      },
+      {
+        "type": "table",
+        "id": "lines",
+        "dataPath": "lines",
+        "columns": [
+          { "header": "Item", "path": "item" },
+          { "header": "Note", "path": "note" },
+          { "header": "Qty", "path": "qty", "align": "right" }
+        ]
+      },
+      {
+        "type": "text",
+        "id": "close",
+        "text": "End of sample",
+        "pageBreakBefore": true
+      }
+    ]
+  }
+}

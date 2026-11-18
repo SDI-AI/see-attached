@@ -2,7 +2,7 @@
 
 See Attached builds the report that rides along as an attachment. The definition is the layout, saved as JSON. The data is a separate JSON object. A `.rcdata` file stores that object with field types, and more than one report can compile it. .NET binds them and compiles one HTML file. A browser shows that HTML. Playwright prints the same HTML to PDF.
 
-The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds. `fixtures/orders` is a second example: nested repeats, four columns, a rule, and bordered panels.
+The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds. `fixtures/orders` is a second example: nested repeats, four columns, a rule, and bordered panels. `fixtures/watermark` is a third: a DRAFT watermark behind a multi-page notice.
 
 ## Requirements
 
@@ -134,7 +134,7 @@ With culture `en-US`, `{invoice.date:MMMM d, yyyy}` prints `March 14, 2026`. A f
 { "type": "field", "id": "customer", "path": "invoice.billTo.name", "bold": true }
 ```
 
-A letter can set the typeface on the block. A rule and a panel do not need a free canvas. The same JSON is what the builder saves, what the compiler paints, and what the PDF prints. Schema version 2 is current. A version 1 file still opens.
+A letter can set the typeface on the block. A rule and a panel do not need a free canvas. The same JSON is what the builder saves, what the compiler paints, and what the PDF prints. Schema version 5 is current. A version 1, 2, 3, or 4 file still opens.
 
 ```json
 { "type": "text", "id": "greeting", "text": "Dear customer,", "fontFamily": "Times New Roman", "italic": true, "underline": true, "lineHeight": 1.35 }
@@ -189,7 +189,7 @@ An image is part of the layout, not the data object:
 }
 ```
 
-The whole `source` value can be up to 2,000,000 characters. Font size is 6 to 96 points. Color is `#RGB` or `#RRGGBB`.
+The whole `source` value can be up to 2,000,000 characters. Font size is 6 to 96 points. A page watermark can go up to 120 points. Color is `#RGB` or `#RRGGBB`.
 
 Two aggregates on the same column show only the first one. The aggregate label prints in the first column when that column has no aggregate of its own.
 
@@ -220,6 +220,29 @@ Any block can set `pageBreakBefore` or `pageBreakAfter`.
   "aggregates": [
     { "label": "Total", "columnPath": "amount", "kind": "sum", "format": "0.00" }
   ]
+}
+```
+
+## Page watermark
+
+A watermark is part of page setup. It is there for migrating Crystal Reports underlay watermarks. It repeats on every printed page, behind the body, and it does not take a row in the flow. Page breaks and "Page N of M" stay the same. Omit `watermark`, or set `enabled` to false, and the report prints as before.
+
+Text is one line, up to 80 characters. It is literal text, not a `{path}` token. Font size is 6 to 120 points. Color is `#RGB` or `#RRGGBB`. Leave the color empty and the compiler uses `#C0C0C0`. Opacity is from 0 to 1, with at most two decimal places. Leave it empty and the color is fully opaque. Rotation is from -180 to 180 degrees. Positive is clockwise. Horizontal alignment is left, center, or right. Vertical position is top, center, or bottom.
+
+An image uses the same `https` URL or data URI rules as an image block. Set `widthMm` and `heightMm`, or leave both empty and the image scales within the page.
+
+The builder edits this in **Page setup**. Saving a report that has a watermark writes schema version 5. The WPF preview is the PDF, so it matches **Export PDF**. The Blazor and Next.js viewers show one long column; the fixed watermark stays on the window instead of once per paper page.
+
+```json
+"watermark": {
+  "enabled": true,
+  "kind": "text",
+  "text": "DRAFT",
+  "fontFamily": "Segoe UI",
+  "fontSizePt": 120,
+  "color": "#C0C0C0",
+  "horizontal": "center",
+  "vertical": "center"
 }
 ```
 
@@ -453,4 +476,4 @@ var definition = ReportJson.Read(reader.ReadToEnd());
 
 ## Where page breaks appear
 
-The builder preview is the PDF, so page breaks, the repeated page header, the repeated page footer, and the page numbers are the printed page. The Blazor and Next.js viewers show one paper-width column. Chromium inserts page breaks when that HTML is printed. A table header repeats on the next page. A row, and a block marked keep together, stay on one page.
+The builder preview is the PDF, so page breaks, the repeated page header, the repeated page footer, the page numbers, and a page watermark are the printed page. The watermark is a fixed layer under the body. It repeats on a short last page and after an explicit page break, and it does not move the body. The Blazor and Next.js viewers show one paper-width column. Chromium inserts page breaks when that HTML is printed. A table header repeats on the next page. A row, and a block marked keep together, stay on one page.

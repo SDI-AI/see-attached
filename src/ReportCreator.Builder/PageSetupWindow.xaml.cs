@@ -7,6 +7,8 @@ namespace ReportCreator.Builder;
 
 public partial class PageSetupWindow : Window
 {
+    private static readonly string[] Fonts = ["", "Source Sans 3", "Arial", "Segoe UI", "Times New Roman", "Georgia", "Courier New"];
+
     private readonly PageSetup _page;
 
     public PageSetupWindow(PageSetup page)
@@ -28,6 +30,24 @@ public partial class PageSetupWindow : Window
         NumberBox.ItemsSource = Enum.GetValues<PageNumberPlacement>();
         NumberBox.SelectedItem = _page.PageNumbers;
         FirstNumberBox.IsChecked = !_page.OmitPageNumberOnFirstPage;
+        var mark = _page.Watermark;
+        WatermarkBox.IsChecked = mark is { Enabled: true };
+        KindBox.ItemsSource = Enum.GetValues<WatermarkKind>();
+        KindBox.SelectedItem = mark?.Kind ?? WatermarkKind.Text;
+        MarkTextBox.Text = mark?.Text ?? "";
+        FontBox.ItemsSource = Fonts;
+        FontBox.SelectedItem = Fonts.Contains(mark?.FontFamily ?? "") ? mark?.FontFamily ?? "" : "";
+        SizeBox.Text = (mark?.FontSizePt ?? 72).ToString(CultureInfo.CurrentCulture);
+        ColorBox.Text = mark?.Color is { Length: > 0 } color ? color : "#C0C0C0";
+        OpacityBox.Text = mark?.Opacity?.ToString(CultureInfo.CurrentCulture) ?? "";
+        RotationBox.Text = (mark?.RotationDegrees ?? 0).ToString(CultureInfo.CurrentCulture);
+        HorizontalBox.ItemsSource = Enum.GetValues<WatermarkHorizontal>();
+        HorizontalBox.SelectedItem = mark?.Horizontal ?? WatermarkHorizontal.Center;
+        VerticalBox.ItemsSource = Enum.GetValues<WatermarkVertical>();
+        VerticalBox.SelectedItem = mark?.Vertical ?? WatermarkVertical.Center;
+        SourceBox.Text = mark?.Source ?? "";
+        ImageWidthBox.Text = mark?.WidthMm?.ToString(CultureInfo.CurrentCulture) ?? "";
+        ImageHeightBox.Text = mark?.HeightMm?.ToString(CultureInfo.CurrentCulture) ?? "";
         UpdateCustom();
     }
 
@@ -72,6 +92,45 @@ public partial class PageSetupWindow : Window
             height = customHeight;
         }
 
+        if (KindBox.SelectedItem is not WatermarkKind kind
+            || HorizontalBox.SelectedItem is not WatermarkHorizontal horizontal
+            || VerticalBox.SelectedItem is not WatermarkVertical vertical)
+            return;
+
+        if (!TryMm(SizeBox.Text, out var fontSize) || !TryMm(RotationBox.Text, out var rotation)
+            || !TryOptional(OpacityBox.Text, out var opacity)
+            || !TryOptional(ImageWidthBox.Text, out var imageWidth)
+            || !TryOptional(ImageHeightBox.Text, out var imageHeight))
+        {
+            MessageBox.Show(this, "Watermark size, opacity, rotation, and image size must be numbers. Leave opacity and image size blank to omit them.", "Page setup");
+            return;
+        }
+
+        var markText = MarkTextBox.Text.Trim();
+        var source = SourceBox.Text.Trim();
+        var enabled = WatermarkBox.IsChecked == true;
+        PageWatermark? watermark = null;
+        if (enabled || markText.Length > 0 || source.Length > 0)
+        {
+            var color = ColorBox.Text.Trim();
+            watermark = new PageWatermark
+            {
+                Enabled = enabled,
+                Kind = kind,
+                Text = markText,
+                FontFamily = FontBox.SelectedItem is string family && family.Length > 0 ? family : null,
+                FontSizePt = fontSize,
+                Color = color.Length == 0 ? null : color,
+                Opacity = opacity,
+                RotationDegrees = rotation,
+                Horizontal = horizontal,
+                Vertical = vertical,
+                Source = source.Length == 0 ? null : source,
+                WidthMm = imageWidth,
+                HeightMm = imageHeight
+            };
+        }
+
         _page.Paper = paper;
         _page.Orientation = orientation;
         _page.CustomWidthMm = width;
@@ -84,6 +143,7 @@ public partial class PageSetupWindow : Window
         _page.PageFooterMm = footer;
         _page.PageNumbers = numbers;
         _page.OmitPageNumberOnFirstPage = FirstNumberBox.IsChecked != true;
+        _page.Watermark = watermark;
 
         var errors = ReportValidator.Validate(new ReportDefinition { Name = "Page", Page = _page });
         if (errors.Count > 0)
@@ -93,6 +153,24 @@ public partial class PageSetupWindow : Window
         }
 
         DialogResult = true;
+    }
+
+    private static bool TryOptional(string text, out decimal? value)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = null;
+            return true;
+        }
+
+        if (!TryMm(text, out var parsed))
+        {
+            value = null;
+            return false;
+        }
+
+        value = parsed;
+        return true;
     }
 
     private static bool TryMm(string text, out decimal value) =>
@@ -115,6 +193,30 @@ public partial class PageSetupWindow : Window
         PageHeaderMm = page.PageHeaderMm,
         PageFooterMm = page.PageFooterMm,
         PageNumbers = page.PageNumbers,
-        OmitPageNumberOnFirstPage = page.OmitPageNumberOnFirstPage
+        OmitPageNumberOnFirstPage = page.OmitPageNumberOnFirstPage,
+        Watermark = CloneWatermark(page.Watermark)
     };
+
+    private static PageWatermark? CloneWatermark(PageWatermark? watermark)
+    {
+        if (watermark is null)
+            return null;
+
+        return new PageWatermark
+        {
+            Enabled = watermark.Enabled,
+            Kind = watermark.Kind,
+            Text = watermark.Text,
+            FontFamily = watermark.FontFamily,
+            FontSizePt = watermark.FontSizePt,
+            Color = watermark.Color,
+            Opacity = watermark.Opacity,
+            RotationDegrees = watermark.RotationDegrees,
+            Horizontal = watermark.Horizontal,
+            Vertical = watermark.Vertical,
+            Source = watermark.Source,
+            WidthMm = watermark.WidthMm,
+            HeightMm = watermark.HeightMm
+        };
+    }
 }
