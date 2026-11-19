@@ -37,8 +37,10 @@ public static partial class ReportCompiler
             .Append(Encode(definition.Name))
             .Append("</title><style>")
             .Append(FontFaces.Value)
-            .Append(SheetCss(size, margin, numberMm, definition.Page.PageNumbers, definition.Page.OmitPageNumberOnFirstPage))
-            .Append("</style></head><body");
+            .Append(SheetCss(size, margin, numberMm, definition.Page.PageNumbers, definition.Page.OmitPageNumberOnFirstPage));
+        if (ContainsBarcode(definition))
+            html.Append(BarcodeCss);
+        html.Append("</style></head><body");
         if (options.DesignMode)
             html.Append(" class=\"design\"");
         html.Append('>');
@@ -173,6 +175,9 @@ public static partial class ReportCompiler
                 if (imageStyle.Length > 0)
                     html.Append(" style=\"").Append(Encode(imageStyle.ToString())).Append('"');
                 html.Append('>');
+                break;
+            case BarcodeBlock barcode:
+                RenderBarcode(html, barcode, definition, scope, options, flags);
                 break;
             case SpacerBlock spacer:
                 html.Append("<div class=\"block spacer")
@@ -610,6 +615,93 @@ public static partial class ReportCompiler
         {
             return moment.ToString(date ? "d" : "t", options.Culture);
         }
+    }
+
+    private const string BarcodeCss =
+        ".barcode svg { display: block; max-width: 100%; }"
+        + ".barcode-caption { font-size: 9pt; line-height: 1.2; margin: 0.6mm 0 0; }"
+        + ".barcode-empty { box-sizing: border-box; border: 0.3mm dashed #9ca3af; background: #f9fafb; color: #6b7280; font-size: 9pt; display: flex; align-items: center; justify-content: center; }";
+
+    private static void RenderBarcode(StringBuilder html, BarcodeBlock barcode, ReportDefinition definition, DataScope scope, CompileOptions options, string flags)
+    {
+        var contents = BarcodeContents(barcode, definition, scope, options);
+        var drawn = BarcodeSvg.Draw(barcode, contents);
+        var size = BarcodeSvg.Box(barcode);
+        html.Append("<div class=\"block barcode");
+        if (!drawn.Ok)
+            html.Append(" barcode-empty");
+        html.Append(flags)
+            .Append("\" data-id=\"").Append(Encode(barcode.Id)).Append('"');
+        if (!drawn.Ok)
+        {
+            var warning = "Barcode '" + barcode.Id + "' " + drawn.Problem + ".";
+            options.Warnings?.Add(warning);
+            html.Append(" data-warning=\"").Append(Encode(warning)).Append('"');
+        }
+
+        var style = new StringBuilder();
+        style.Append(BoxCss(barcode.Style));
+        style.Append("text-align:").Append(AlignCss(barcode.Align)).Append(';');
+        if (!drawn.Ok)
+        {
+            style.Append("width:").Append(Num(size.Width)).Append("mm;height:").Append(Num(size.Height)).Append("mm;");
+        }
+
+        AppendStyleAttribute(html, style.ToString());
+        html.Append('>');
+        if (drawn.Ok)
+        {
+            html.Append(drawn.Svg);
+            if (drawn.Caption is not null)
+                html.Append("<div class=\"barcode-caption\">").Append(Encode(drawn.Caption)).Append("</div>");
+        }
+        else
+            html.Append("<span class=\"barcode-note\">Invalid barcode</span>");
+        html.Append("</div>");
+    }
+
+    private static string BarcodeContents(BarcodeBlock barcode, ReportDefinition definition, DataScope scope, CompileOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(barcode.Path))
+            return (barcode.Value ?? "").Trim();
+        if (!TryResolveValue(barcode.Path, definition, scope, options, out var value))
+            return "";
+        return DataValues.Format(value, null, CultureInfo.InvariantCulture).Trim();
+    }
+
+    private static bool ContainsBarcode(ReportDefinition definition) =>
+        ContainsBarcode(definition.PageHeader?.Blocks)
+        || ContainsBarcode(definition.Header?.Blocks)
+        || ContainsBarcode(definition.Body?.Blocks)
+        || ContainsBarcode(definition.Footer?.Blocks)
+        || ContainsBarcode(definition.PageFooter?.Blocks);
+
+    private static bool ContainsBarcode(List<Block>? blocks)
+    {
+        if (blocks is null)
+            return false;
+
+        foreach (var block in blocks)
+        {
+            switch (block)
+            {
+                case BarcodeBlock:
+                    return true;
+                case ColumnsBlock columns:
+                    foreach (var column in columns.Columns)
+                    {
+                        if (ContainsBarcode(column.Blocks))
+                            return true;
+                    }
+                    break;
+                case PanelBlock panel when ContainsBarcode(panel.Blocks):
+                    return true;
+                case RepeatBlock repeat when ContainsBarcode(repeat.Blocks):
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string SheetCss(PageSize size, Margin margin, decimal numberMm, PageNumberPlacement numbers, bool omitFirstPageNumber) =>

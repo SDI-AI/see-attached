@@ -1,0 +1,10 @@
+{
+  "shipment": {
+    "invoice": "INV-2048",
+    "date": "2026-04-02",
+    "recipient": "Sample Recipient",
+    "city": "Example City",
+    "tracking": "TRK100000001",
+    "reference": "SHIP-REF-2048"
+  }
+}

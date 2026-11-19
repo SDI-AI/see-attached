@@ -2,7 +2,7 @@
 
 See Attached builds the report that rides along as an attachment. The definition is the layout, saved as JSON. The data is a separate JSON object. A `.rcdata` file stores that object with field types, and more than one report can compile it. .NET binds them and compiles one HTML file. A browser shows that HTML. Playwright prints the same HTML to PDF.
 
-The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds. `fixtures/orders` is a second example: nested repeats, four columns, a rule, and bordered panels. `fixtures/watermark` is a third: a DRAFT watermark behind a multi-page notice.
+The invoice files in `fixtures/invoice` are a complete example. `definition.json` is the layout. `data.json` is the object the layout binds. `fixtures/orders` is a second example: nested repeats, four columns, a rule, and bordered panels. `fixtures/watermark` is a third: a DRAFT watermark behind a multi-page notice. `fixtures/barcode` is a shipping label with sample tracking numbers, a QR code, and the other symbologies. The numbers are made up.
 
 ## Requirements
 
@@ -120,6 +120,7 @@ Every block needs its own id: letters, digits, `_`, or `-`, up to 64 characters.
 | Spacer | Empty vertical room, in millimetres. |
 | Columns | One to eight columns. Set `widthMm` or `weight` on a column. A column with neither shares the remaining width. The builder can add a text, field, spacer, table, or panel inside a column. A columns block may contain one more columns block, and that inner block cannot contain another. |
 | Table | Rows from an array of objects. Column paths are read from each row. Sum, Count, and Avg print in a footer. The header row repeats when the table continues on the next page. A column `widthMm` is written on a `colgroup`, so the width holds when the header is hidden and when a group title spans the table. **Group by** is a path on each row. **Group totals** print under each group. **Running total** replaces that column with the sum so far and starts again at each group. |
+| Barcode | A Code 128, Code 39, QR Code, EAN-13, UPC-A, Data Matrix, or PDF417 symbol. `value` is a literal. `path` reads the current record, and a set path wins over `value`. The compiler writes inline SVG at the block's width and height in millimetres. |
 
 A text block mixes words and values:
 
@@ -134,7 +135,18 @@ With culture `en-US`, `{invoice.date:MMMM d, yyyy}` prints `March 14, 2026`. A f
 { "type": "field", "id": "customer", "path": "invoice.billTo.name", "bold": true }
 ```
 
-A letter can set the typeface on the block. A rule and a panel do not need a free canvas. The same JSON is what the builder saves, what the compiler paints, and what the PDF prints. Schema version 5 is current. A version 1, 2, 3, or 4 file still opens.
+A barcode is the same kind of block. `symbology` is `code128`, `code39`, `qrCode`, `ean13`, `upcA`, `dataMatrix`, or `pdf417`. `showText` prints the value under a linear code. `errorCorrection` is `low`, `medium`, `quartile`, or `high`, and only QR Code uses it. `color` and `background` are `#RGB` or `#RRGGBB`. `quietZone` is a module count. Leave it unset for the usual quiet zone: 10 for a linear code, 4 for QR Code, 1 for Data Matrix, and 2 for PDF417. `align` is `left`, `center`, or `right`. The builder adds a barcode from the block list.
+
+```json
+{ "type": "barcode", "id": "tracking", "symbology": "code128", "path": "shipment.tracking", "showText": true, "widthMm": 70, "heightMm": 18 }
+{ "type": "barcode", "id": "reference", "symbology": "qrCode", "value": "SHIP-REF-2048", "errorCorrection": "medium", "widthMm": 32, "heightMm": 32 }
+```
+
+An empty value does not fail the compile. Neither does a value the symbology rejects, such as letters in an EAN-13 or a bad check digit. The block draws a dashed box that says "Invalid barcode". The HTML carries the reason on `data-warning`. Pass a list as `CompileOptions.Warnings` and the compiler adds the same sentence there. EAN-13 takes 12 or 13 digits. Twelve digits gain a check digit. UPC-A takes 11 or 12 digits and follows the same rule. Code 39 allows digits, uppercase letters, a space, and `- . $ / + %`. The text line is only drawn for Code 128, Code 39, EAN-13, and UPC-A. QR Code and Data Matrix scan more reliably when the width and the height match. There is no GS1 mode. Store the value as a string. Saving a report that contains a barcode writes schema version 6.
+
+`fixtures/barcode` is a shipping label you can open in the builder or compile yourself. The Next.js sample shows it after `dotnet run --project samples/render-fixture`, on the Shipping label button. The Blazor sample has the same button.
+
+A letter can set the typeface on the block. A rule and a panel do not need a free canvas. The same JSON is what the builder saves, what the compiler paints, and what the PDF prints. Schema version 6 is current. A version 1, 2, 3, 4, or 5 file still opens.
 
 ```json
 { "type": "text", "id": "greeting", "text": "Dear customer,", "fontFamily": "Times New Roman", "italic": true, "underline": true, "lineHeight": 1.35 }
@@ -231,7 +243,7 @@ Text is one line, up to 80 characters. It is literal text, not a `{path}` token.
 
 An image uses the same `https` URL or data URI rules as an image block. Set `widthMm` and `heightMm`, or leave both empty and the image scales within the page.
 
-The builder edits this in **Page setup**. Saving a report that has a watermark writes schema version 5. The WPF preview is the PDF, so it matches **Export PDF**. The Blazor and Next.js viewers show one long column; the fixed watermark stays on the window instead of once per paper page.
+The builder edits this in **Page setup**. Saving a report that has a watermark and no barcode writes schema version 5. The WPF preview is the PDF, so it matches **Export PDF**. The Blazor and Next.js viewers show one long column; the fixed watermark stays on the window instead of once per paper page.
 
 ```json
 "watermark": {

@@ -5,6 +5,7 @@ using ReportCreator.Model;
 var root = FindRoot();
 WriteHtml(root, "invoice");
 WriteHtml(root, "orders");
+WriteHtml(root, "barcode");
 
 static void WriteHtml(string root, string name)
 {

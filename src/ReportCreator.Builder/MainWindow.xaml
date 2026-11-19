@@ -67,6 +67,7 @@
                             <ComboBoxItem Content="Text" />
                             <ComboBoxItem Content="Field" />
                             <ComboBoxItem Content="Image" />
+                            <ComboBoxItem Content="Barcode" />
                             <ComboBoxItem Content="Spacer" />
                             <ComboBoxItem Content="Columns" />
                             <ComboBoxItem Content="Table" />
@@ -81,7 +82,7 @@
                         <Button Content="Down" Style="{StaticResource QuietButton}" Margin="4,0,0,0" Click="Down_Click" />
                         <Button Content="Delete" Style="{StaticResource QuietButton}" Margin="4,0,0,0" Click="Delete_Click" />
                     </StackPanel>
-                    <TextBlock Style="{StaticResource Eyebrow}" Margin="2,4,0,0" Text="Text · Field · Image" />
+                    <TextBlock Style="{StaticResource Eyebrow}" Margin="2,4,0,0" Text="Text · Field · Image · Barcode" />
                     <TextBlock Style="{StaticResource Eyebrow}" Margin="2,2,0,0" Text="Spacer · Columns · Table · Rule · Panel · Repeat" />
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource Eyebrow}" Margin="18,18,16,4" Text="REPORT BLOCKS" />

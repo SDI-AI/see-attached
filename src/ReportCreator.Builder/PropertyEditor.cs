@@ -96,6 +96,25 @@ internal static class PropertyEditor
                 AddOptionalMm(panel, "Width mm", image.WidthMm, value => image.WidthMm = value, preview);
                 AddOptionalMm(panel, "Height mm", image.HeightMm, value => image.HeightMm = value, preview);
                 break;
+            case BarcodeBlock barcode:
+                AddLabel(panel, "Symbology");
+                AddEnum(panel, barcode.Symbology, value => barcode.Symbology = value, preview);
+                AddText(panel, "Value", barcode.Value, value => barcode.Value = value, preview, multiline: false);
+                AddText(panel, "Path", barcode.Path ?? "", value => barcode.Path = Blank(value), preview, multiline: false);
+                AddCheck(panel, "Show text", barcode.ShowText, value =>
+                {
+                    barcode.ShowText = value;
+                    preview();
+                });
+                AddLabel(panel, "QR error correction");
+                AddEnum(panel, barcode.ErrorCorrection, value => barcode.ErrorCorrection = value, preview);
+                AddText(panel, "Color", barcode.Color ?? "", value => barcode.Color = Blank(value), preview, multiline: false);
+                AddText(panel, "Background", barcode.Background ?? "", value => barcode.Background = Blank(value), preview, multiline: false);
+                AddOptionalInt(panel, "Quiet zone", barcode.QuietZone, value => barcode.QuietZone = value, preview);
+                AddAlign(panel, barcode.Align, value => barcode.Align = value, preview);
+                AddOptionalMm(panel, "Width mm", barcode.WidthMm, value => barcode.WidthMm = value, preview);
+                AddOptionalMm(panel, "Height mm", barcode.HeightMm, value => barcode.HeightMm = value, preview);
+                break;
             case SpacerBlock spacer:
                 AddMm(panel, "Height mm", spacer.HeightMm, value => spacer.HeightMm = value, preview);
                 break;
@@ -137,6 +156,7 @@ internal static class PropertyEditor
         ModelText => "Text",
         FieldBlock => "Field",
         ImageBlock => "Image",
+        BarcodeBlock => "Barcode",
         SpacerBlock => "Spacer",
         ColumnsBlock => "Columns",
         TableBlock => "Table",
@@ -206,7 +226,7 @@ internal static class PropertyEditor
 
     private static void AddPanelTools(StackPanel panel, PanelBlock container, Action preview, Action rebuild)
     {
-        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Image", "Spacer", "Rule", "Table" }, SelectedIndex = 0 };
+        var kind = new ComboBox { ItemsSource = new[] { "Text", "Field", "Image", "Barcode", "Spacer", "Rule", "Table" }, SelectedIndex = 0 };
         Use(kind, "FieldCombo");
         panel.Children.Add(kind);
         var button = Quiet("Add inside panel");
@@ -644,6 +664,51 @@ internal static class PropertyEditor
             table.TableStyle = null;
     }
 
+    private static void AddEnum<T>(StackPanel panel, T value, Action<T> set, Action preview) where T : struct, Enum
+    {
+        var box = new ComboBox { ItemsSource = Enum.GetValues<T>(), SelectedItem = value };
+        Use(box, "FieldCombo");
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedItem is T selected)
+            {
+                set(selected);
+                preview();
+            }
+        };
+        panel.Children.Add(box);
+    }
+
+    private static void AddOptionalInt(StackPanel panel, string label, int? value, Action<int?> set, Action preview)
+    {
+        AddLabel(panel, label);
+        var box = new TextBox { Text = value?.ToString(CultureInfo.CurrentCulture) ?? "" };
+        Use(box, "FieldBox");
+        box.LostFocus += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(box.Text))
+            {
+                set(null);
+                box.ClearValue(Control.BorderBrushProperty);
+                preview();
+                return;
+            }
+
+            if (int.TryParse(box.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var parsed)
+                || int.TryParse(box.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+            {
+                set(parsed);
+                box.ClearValue(Control.BorderBrushProperty);
+                preview();
+            }
+            else
+            {
+                box.BorderBrush = Brushes.Firebrick;
+            }
+        };
+        panel.Children.Add(box);
+    }
+
     private static void AddAlign(StackPanel panel, TextAlign align, Action<TextAlign> set, Action preview)
     {
         AddLabel(panel, "Align");
@@ -775,6 +840,7 @@ internal static class PropertyEditor
     {
         "Field" => new FieldBlock { Id = NewId(), Path = "name" },
         "Image" => new ImageBlock { Id = NewId(), Source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", Alt = "" },
+        "Barcode" => new BarcodeBlock { Id = NewId(), Value = "SAMPLE-001", ShowText = true, WidthMm = 50, HeightMm = 18 },
         "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
         "Panel" => new PanelBlock { Id = NewId() },
         "Columns" => new ColumnsBlock { Id = NewId(), Columns = [new Column(), new Column()] },

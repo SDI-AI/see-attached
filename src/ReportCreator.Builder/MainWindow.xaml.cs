@@ -622,6 +622,7 @@ public partial class MainWindow : Window
     {
         "Field" => new FieldBlock { Id = NewId(), Path = "name" },
         "Image" => new ImageBlock { Id = NewId(), Source = TinyPng, Alt = "", WidthMm = 40 },
+        "Barcode" => new BarcodeBlock { Id = NewId(), Value = "SAMPLE-001", ShowText = true, WidthMm = 50, HeightMm = 18 },
         "Spacer" => new SpacerBlock { Id = NewId(), HeightMm = 6 },
         "Columns" => new ColumnsBlock { Id = NewId(), Columns = [new Column(), new Column()] },
         "Rule" => new RuleBlock { Id = NewId(), ThicknessMm = 0.3m },
@@ -681,6 +682,9 @@ public partial class MainWindow : Window
             ModelText text => FirstLine(text.Text),
             FieldBlock bound => bound.Path,
             ImageBlock image => string.IsNullOrWhiteSpace(image.Alt) ? "Image" : FirstLine(image.Alt),
+            BarcodeBlock barcode => string.IsNullOrWhiteSpace(barcode.Path)
+                ? string.IsNullOrWhiteSpace(barcode.Value) ? "Barcode" : FirstLine(barcode.Value)
+                : barcode.Path,
             SpacerBlock spacer => spacer.HeightMm.ToString(System.Globalization.CultureInfo.CurrentCulture) + " mm",
             ColumnsBlock columns => columns.Columns.Count + (columns.Columns.Count == 1 ? " column" : " columns"),
             RuleBlock => "Rule",

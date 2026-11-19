@@ -43,10 +43,55 @@ public static class ReportJson
     public static string Write(ReportDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        // A watermark is a version 5 feature. Older files that gain one record that when they are saved.
-        if (definition.Page?.Watermark is not null && definition.SchemaVersion < ReportDefinition.CurrentSchemaVersion)
-            definition.SchemaVersion = ReportDefinition.CurrentSchemaVersion;
+        // A watermark is version 5. A barcode is version 6. Older files record that when they are saved.
+        var required = RequiredSchema(definition);
+        if (definition.SchemaVersion < required)
+            definition.SchemaVersion = required;
         return JsonSerializer.Serialize(definition, Options);
+    }
+
+    private static int RequiredSchema(ReportDefinition definition)
+    {
+        if (ContainsBarcode(definition))
+            return 6;
+        if (definition.Page?.Watermark is not null)
+            return 5;
+        return definition.SchemaVersion;
+    }
+
+    private static bool ContainsBarcode(ReportDefinition definition) =>
+        ContainsBarcode(definition.PageHeader?.Blocks)
+        || ContainsBarcode(definition.Header?.Blocks)
+        || ContainsBarcode(definition.Body?.Blocks)
+        || ContainsBarcode(definition.Footer?.Blocks)
+        || ContainsBarcode(definition.PageFooter?.Blocks);
+
+    private static bool ContainsBarcode(List<Block>? blocks)
+    {
+        if (blocks is null)
+            return false;
+
+        foreach (var block in blocks)
+        {
+            switch (block)
+            {
+                case BarcodeBlock:
+                    return true;
+                case ColumnsBlock columns:
+                    foreach (var column in columns.Columns)
+                    {
+                        if (ContainsBarcode(column.Blocks))
+                            return true;
+                    }
+                    break;
+                case PanelBlock panel when ContainsBarcode(panel.Blocks):
+                    return true;
+                case RepeatBlock repeat when ContainsBarcode(repeat.Blocks):
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     public static ReportDefinition Read(string json) =>
