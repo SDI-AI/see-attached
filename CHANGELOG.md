@@ -9,6 +9,7 @@ Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.2
 - Schema version 6 is current. Versions 1 through 5 still compile. Saving a report that has a barcode writes version 6.
 - `fixtures/barcode` is a sample shipping label. The values are synthetic.
 - Barcode matrices come from ZXing.Net, Apache-2.0. The compiler draws the SVG itself.
+- The Next.js sample uses 16.4.5, which clears the advisories reported against 16.4.0.
 
 ## 1.27.0
 
