@@ -24,7 +24,7 @@ Next.js does not bind data. PDF export compiles from the definition and the data
 
 Copyright (c) 2026 Innov8now LLC. License: MIT.
 
-Current version: 1.27.0. There is no NuGet package yet; clone the repo and reference the projects from source.
+Current version: 1.28.0. There is no NuGet package yet; clone the repo and reference the projects from source.
 
 Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/getting-started.md).
 
@@ -49,6 +49,13 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 - A block can break the page before itself or after itself.
 - A grouped table is one table per group. The group title and the column header both sit in the table head, so they repeat when the group crosses a page. The report total stays on the last group.
 - A later group can start on a new page. A group stays on one page when it fits.
+
+## What 1.28 adds
+
+- A barcode block encodes a bound path or a literal value and compiles to inline SVG. The same SVG is what the PDF prints and what the Blazor and Next.js viewers show. This is the sort of mark that is common on migrated Crystal Reports labels and invoices.
+- Symbologies are Code 128, Code 39, QR Code, EAN-13, UPC-A, Data Matrix, and PDF417. Width and height are millimetres. A linear code can print the value underneath. QR Code has an error-correction level. Color, background, quiet zone, and alignment are optional.
+- An empty value, or a value the symbology cannot encode, draws a dashed box labeled "Invalid barcode" and does not fail the compile. The reason is a `data-warning` attribute. Pass `CompileOptions.Warnings` to collect the same text.
+- Report schema version 6 is current. Version 1, 2, 3, 4, and 5 files still open. A file gains version 6 when it is saved with a barcode. `fixtures/barcode` is a sample shipping label. The numbers are made up.
 
 ## What 1.27 adds
 
@@ -97,7 +104,7 @@ Setup, the WPF builder, and code samples are in [docs/getting-started.md](docs/g
 
 ## Not in this version
 
-Charts, barcodes, a formula language, raw HTML in text, right-to-left layout, and a free canvas.
+Charts, a formula language, raw HTML in text, right-to-left layout, and a free canvas.
 
 ## Projects
 
@@ -110,10 +117,11 @@ Charts, barcodes, a formula language, raw HTML in text, right-to-left layout, an
 | `src/ReportCreator.Builder` | WPF builder |
 | `samples/viewer-blazor` | Blazor host for the invoice fixture |
 | `samples/viewer-next` | Next.js host for the same HTML |
-| `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html` and `orders.html` |
+| `samples/render-fixture` | Writes `samples/viewer-next/public/invoice.html`, `orders.html`, and `barcode.html` |
 | `fixtures/invoice` | Invoice definition and data |
 | `fixtures/orders` | Nested repeats, four columns, and styled panels |
 | `fixtures/watermark` | A page watermark on a multi-page notice |
+| `fixtures/barcode` | A shipping label with linear codes, a QR code, Data Matrix, and PDF417 |
 | `tests/ReportCreator.Compile.Tests` | HTML checks, no browser |
 | `tests/ReportCreator.Pdf.Tests` | Page size, text, and a table that crosses pages |
 | `Dockerfile` | Blazor sample image with Chromium installed |
@@ -146,7 +154,7 @@ Blazor sample (compiles the invoice, zoom, print, and Make PDF):
 dotnet run --project samples/viewer-blazor --launch-profile http
 ```
 
-The page is `http://localhost:5250`. The report iframe is sandboxed with `allow-same-origin` and `allow-modals` only, so report markup cannot run script. Set `REPORTCREATOR_CONTAINER=1` before launch when the sample itself runs in a locked-down container. The library does not read that variable.
+The page is `http://localhost:5250`. Invoice is the default. Shipping label opens `fixtures/barcode`. The report iframe is sandboxed with `allow-same-origin` and `allow-modals` only, so report markup cannot run script. Set `REPORTCREATOR_CONTAINER=1` before launch when the sample itself runs in a locked-down container. The library does not read that variable.
 
 Next.js sample (display only, no PDF button):
 
@@ -157,7 +165,7 @@ npm install
 npm run dev
 ```
 
-`npm install` and `npm run dev` must run inside `samples/viewer-next`. Do not add a `package.json` at the repository root. Next.js 16 added `@types/node` 26.6.5 as a sample dev dependency the first time `next build` saw TypeScript. It is not used by the .NET libraries.
+`npm install` and `npm run dev` must run inside `samples/viewer-next`. Do not add a `package.json` at the repository root. The page has Invoice, Orders, and Shipping label. Shipping label is `fixtures/barcode`, written to `public/barcode.html` by the fixture renderer. Next.js 16 added `@types/node` 26.6.5 as a sample dev dependency the first time `next build` saw TypeScript. It is not used by the .NET libraries.
 
 The WPF builder is `src/ReportCreator.Builder`. File menu: new report, the invoice sample, open and save JSON or a `.rcreport` zip, open and save a `.rcdata` data file, export HTML, and export PDF. Page setup edits paper, orientation, margins, page-header height, page-footer height, page numbers, and whether page 1 is numbered. Select a block in the list and edit it in the property panel. The Data expander shows the data file name. Edit data opens one window: a tree of nodes on the left, and the selected node on the right. A plus on the root, an object, or a 1:N adds a field under that node. A collection such as invoice.items is a 1:N nested under the invoice object. The sample values live in that same file. Insert missing fields adds paths the open report binds and leaves values already set. The same data file can be opened with another report. Saving the report does not write the data into it. Reorder with Up and Down. The preview is the PDF, shown in WebView2, and it refreshes about half a second after the report or the data changes. Selecting a block does not reprint. WebView2 needs the WebView2 runtime, and PDF preview needs Chromium installed for the builder output.
 
@@ -186,6 +194,7 @@ Nothing else is added without asking.
 
 | Piece | Where | License |
 | --- | --- | --- |
+| ZXing.Net | Barcode module matrices in the compiler | Apache-2.0 |
 | Microsoft.Playwright | PDF library and PDF tests | Apache-2.0 |
 | Microsoft.Web.WebView2 | WPF builder only | BSD-3-Clause |
 | Source Sans 3 regular and bold | Vendored font files | OFL-1.1 |

@@ -15,6 +15,25 @@ public enum ImageFit
     Contain
 }
 
+public enum BarcodeSymbology
+{
+    Code128,
+    Code39,
+    QrCode,
+    Ean13,
+    UpcA,
+    DataMatrix,
+    Pdf417
+}
+
+public enum QrErrorCorrection
+{
+    Low,
+    Medium,
+    Quartile,
+    High
+}
+
 public enum AggregateKind
 {
     Sum,
@@ -26,6 +45,7 @@ public enum AggregateKind
 [JsonDerivedType(typeof(TextBlock), "text")]
 [JsonDerivedType(typeof(FieldBlock), "field")]
 [JsonDerivedType(typeof(ImageBlock), "image")]
+[JsonDerivedType(typeof(BarcodeBlock), "barcode")]
 [JsonDerivedType(typeof(SpacerBlock), "spacer")]
 [JsonDerivedType(typeof(ColumnsBlock), "columns")]
 [JsonDerivedType(typeof(TableBlock), "table")]
@@ -152,6 +172,39 @@ public sealed class ImageBlock : Block
     public string Alt { get; set; } = "";
 
     public ImageFit Fit { get; set; } = ImageFit.None;
+
+    public TextAlign Align { get; set; } = TextAlign.Left;
+}
+
+public sealed class BarcodeBlock : Block
+{
+    public const int MaxValueLength = 2048;
+
+    public const int MaxQuietZone = 32;
+
+    public BarcodeSymbology Symbology { get; set; } = BarcodeSymbology.Code128;
+
+    // Used when Path is empty. A set path wins, the same way an image source path wins.
+    public string Value { get; set; } = "";
+
+    public string? Path { get; set; }
+
+    public decimal? WidthMm { get; set; }
+
+    public decimal? HeightMm { get; set; }
+
+    // Linear codes only. QR Code, Data Matrix, and PDF417 ignore it.
+    public bool ShowText { get; set; }
+
+    // QR Code only. Other symbologies ignore it.
+    public QrErrorCorrection ErrorCorrection { get; set; } = QrErrorCorrection.Medium;
+
+    public string? Color { get; set; }
+
+    public string? Background { get; set; }
+
+    // Modules of quiet zone. Null uses the symbology default.
+    public int? QuietZone { get; set; }
 
     public TextAlign Align { get; set; } = TextAlign.Left;
 }

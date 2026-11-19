@@ -144,6 +144,9 @@ public static partial class ReportBindings
             case ImageBlock image when !string.IsNullOrWhiteSpace(image.SourcePath):
                 AddScoped(add, image.SourcePath, ReportBindingKind.Value, null, itemPath, parentPath);
                 break;
+            case BarcodeBlock barcode when !string.IsNullOrWhiteSpace(barcode.Path):
+                AddScoped(add, barcode.Path, ReportBindingKind.Value, null, itemPath, parentPath);
+                break;
             case FieldBlock field when field.Path.Length > 0:
                 AddScoped(add, field.Path, ReportBindingKind.Value, field.Format, itemPath, parentPath);
                 break;

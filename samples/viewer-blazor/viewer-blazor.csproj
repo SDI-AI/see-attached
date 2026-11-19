@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <Content Include="..\..\fixtures\invoice\*.json" Link="fixtures\invoice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\fixtures\barcode\*.json" Link="fixtures\barcode\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

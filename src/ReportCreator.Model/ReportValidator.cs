@@ -221,6 +221,27 @@ public static partial class ReportValidator
                 if (image.Alt.Length > 200)
                     errors.Add($"{where} alt text is too long.");
                 break;
+            case BarcodeBlock barcode:
+                if (!Enum.IsDefined(barcode.Symbology))
+                    errors.Add($"{where} barcode symbology is not recognized.");
+                if (!Enum.IsDefined(barcode.ErrorCorrection))
+                    errors.Add($"{where} error correction is not recognized.");
+                if (!Enum.IsDefined(barcode.Align))
+                    errors.Add($"{where} alignment is not recognized.");
+                if (!string.IsNullOrWhiteSpace(barcode.Path) && !StyleRules.IsBindingPath(barcode.Path))
+                    errors.Add($"{where} needs a binding path such as shipment.tracking.");
+                CheckParameter(barcode.Path, where, parameters, errors);
+                if ((barcode.Value ?? "").Length > BarcodeBlock.MaxValueLength)
+                    errors.Add($"{where} value is too long.");
+                if (barcode.Color is not null && !StyleRules.IsHexColor(barcode.Color))
+                    errors.Add($"{where} color must be a #RGB or #RRGGBB value.");
+                if (barcode.Background is not null && !StyleRules.IsHexColor(barcode.Background))
+                    errors.Add($"{where} background must be a #RGB or #RRGGBB value.");
+                if (barcode.QuietZone is int quiet && (quiet < 0 || quiet > BarcodeBlock.MaxQuietZone))
+                    errors.Add($"{where} quiet zone must be between 0 and {BarcodeBlock.MaxQuietZone} modules.");
+                RequireMm(barcode.WidthMm, $"{where} barcode width", errors, positive: true, allowNull: true);
+                RequireMm(barcode.HeightMm, $"{where} barcode height", errors, positive: true, allowNull: true);
+                break;
             case SpacerBlock spacer:
                 RequireMm(spacer.HeightMm, $"{where} spacer height", errors, positive: true);
                 break;

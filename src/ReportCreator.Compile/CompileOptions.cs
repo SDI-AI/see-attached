@@ -16,4 +16,7 @@ public sealed class CompileOptions
 
     // Wall-clock time for {print.date} and {print.time}. Null uses the local time of the compile.
     public DateTimeOffset? Clock { get; init; }
+
+    // Optional sink. An invalid barcode appends a message here and still compiles.
+    public ICollection<string>? Warnings { get; init; }
 }

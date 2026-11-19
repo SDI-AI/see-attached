@@ -7,17 +7,19 @@
 @using ReportCreator.Model
 @using ReportCreator.Pdf
 
-<PageTitle>Invoice</PageTitle>
+<PageTitle>@_definition.Name</PageTitle>
 
 <div class="host">
     <div class="actions">
+        <button type="button" @onclick='() => Show("invoice")' disabled="@_busy">Invoice</button>
+        <button type="button" @onclick='() => Show("barcode")' disabled="@_busy">Shipping label</button>
         <button type="button" @onclick="MakePdfAsync" disabled="@_busy">@_pdfLabel</button>
         @if (_error is not null)
         {
             <span class="error">@_error</span>
         }
     </div>
-    <ReportViewer Html="@_html" Pdf="@_pdf" PdfFileName="invoice.pdf" />
+    <ReportViewer Html="@_html" Pdf="@_pdf" PdfFileName="@(_fixture + ".pdf")" />
 </div>
 
 @code {
@@ -26,10 +28,14 @@
     private string? _error;
     private bool _busy;
     private string _pdfLabel = "Make PDF";
+    private string _fixture = "invoice";
 
-    protected override void OnInitialized()
+    protected override void OnInitialized() => Show("invoice");
+
+    private void Show(string fixture)
     {
-        var root = Path.Combine(AppContext.BaseDirectory, "fixtures", "invoice");
+        _fixture = fixture;
+        var root = Path.Combine(AppContext.BaseDirectory, "fixtures", fixture);
         var definition = ReportJson.Read(File.ReadAllText(Path.Combine(root, "definition.json")));
         var data = ReportJson.ReadData(File.ReadAllText(Path.Combine(root, "data.json")));
         _html = ReportCompiler.Compile(definition, data, new CompileOptions
@@ -38,6 +44,9 @@
         });
         _definition = definition;
         _data = data;
+        _pdf = null;
+        _error = null;
+        _pdfLabel = "Make PDF";
     }
 
     private ReportDefinition _definition = new();

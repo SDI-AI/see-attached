@@ -1,6 +1,14 @@
 # Changelog
 
-Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.26.1, and 1.27. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+Versions follow the sections already used in the README: v1, 1.1, 1.2, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.26.1, 1.27, and 1.28. This file starts at 1.21, the state of `main` at `33f5f33` (2026-10-13).
+
+## 1.28.0
+
+- A report can include a barcode. The value is a bound path or a literal, and the compiler writes inline SVG. Code 128, Code 39, QR Code, EAN-13, UPC-A, Data Matrix, and PDF417 are supported. Width, height, a text line under linear codes, QR error correction, colors, quiet zone, and alignment are saved on the block.
+- An empty or rejected value draws an "Invalid barcode" box and records a warning when `CompileOptions.Warnings` is set. The compile does not fail.
+- Schema version 6 is current. Versions 1 through 5 still compile. Saving a report that has a barcode writes version 6.
+- `fixtures/barcode` is a sample shipping label. The values are synthetic.
+- Barcode matrices come from ZXing.Net, Apache-2.0. The compiler draws the SVG itself.
 
 ## 1.27.0
 

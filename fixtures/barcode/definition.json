@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 6,
+  "name": "Shipping label",
+  "page": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": { "top": 14, "right": 14, "bottom": 14, "left": 14 }
+  },
+  "header": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "title",
+        "text": "Shipping label",
+        "bold": true,
+        "fontSizePt": 22
+      },
+      {
+        "type": "text",
+        "id": "meta",
+        "text": "Invoice {shipment.invoice}\n{shipment.date:MMMM d, yyyy}"
+      }
+    ]
+  },
+  "body": {
+    "blocks": [
+      {
+        "type": "text",
+        "id": "to-label",
+        "text": "Ship to",
+        "bold": true,
+        "fontSizePt": 9,
+        "color": "#6b7280"
+      },
+      {
+        "type": "text",
+        "id": "to",
+        "text": "{shipment.recipient}\n{shipment.city}"
+      },
+      {
+        "type": "barcode",
+        "id": "tracking",
+        "symbology": "code128",
+        "path": "shipment.tracking",
+        "showText": true,
+        "widthMm": 70,
+        "heightMm": 18
+      },
+      {
+        "type": "barcode",
+        "id": "invoice-code",
+        "symbology": "code39",
+        "path": "shipment.invoice",
+        "showText": true,
+        "widthMm": 60,
+        "heightMm": 16
+      },
+      {
+        "type": "columns",
+        "id": "retail",
+        "columns": [
+          {
+            "blocks": [
+              { "type": "text", "id": "item-label", "text": "Item", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              {
+                "type": "barcode",
+                "id": "item",
+                "symbology": "ean13",
+                "value": "2001234567893",
+                "showText": true,
+                "widthMm": 48,
+                "heightMm": 18
+              }
+            ]
+          },
+          {
+            "blocks": [
+              { "type": "text", "id": "carton-label", "text": "Carton", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              {
+                "type": "barcode",
+                "id": "carton",
+                "symbology": "upcA",
+                "value": "012345678905",
+                "showText": true,
+                "widthMm": 48,
+                "heightMm": 18
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "columns",
+        "id": "marks",
+        "columns": [
+          {
+            "blocks": [
+              { "type": "text", "id": "ref-label", "text": "Reference", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              {
+                "type": "barcode",
+                "id": "reference",
+                "symbology": "qrCode",
+                "path": "shipment.reference",
+                "errorCorrection": "medium",
+                "widthMm": 32,
+                "heightMm": 32
+              }
+            ]
+          },
+          {
+            "blocks": [
+              { "type": "text", "id": "lot-label", "text": "Lot", "bold": true, "fontSizePt": 9, "color": "#6b7280" },
+              {
+                "type": "barcode",
+                "id": "lot",
+                "symbology": "dataMatrix",
+                "value": "LOT-2048-A",
+                "widthMm": 28,
+                "heightMm": 28
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "id": "doc-label",
+        "text": "Document",
+        "bold": true,
+        "fontSizePt": 9,
+        "color": "#6b7280"
+      },
+      {
+        "type": "barcode",
+        "id": "document",
+        "symbology": "pdf417",
+        "value": "DOC-2048-SAMPLE",
+        "widthMm": 70,
+        "heightMm": 20
+      }
+    ]
+  }
+}
